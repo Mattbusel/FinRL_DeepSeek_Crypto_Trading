@@ -94,11 +94,7 @@ python task1_eval.py
 
 ###  Metrics on Validation Set
 
-| Metric            | Value  |
-| ----------------- | ------ |
-| Cumulative Return | +47.2% |
-| Sharpe Ratio      | 1.23   |
-| Max Drawdown      | -6.4%  |
+
 
 ---
 
