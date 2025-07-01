@@ -1,0 +1,21 @@
+# macOS system files
+.DS_Store
+
+# Python environment
+venv/
+
+# Python cache files
+__pycache__/
+*.pyc
+
+# Model files
+*.pkl
+*.pt
+
+# Logs
+*.log
+
+# Numpy arrays & data
+*.npy
+data/*.npy
+data/*.csv
