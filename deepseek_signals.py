@@ -19,7 +19,7 @@ logging.basicConfig(
 )
 
 client = OpenAI(
-    api_key="sk-82119e72db2047a1b8d7aa3f664e5527",
+    api_key="",
     base_url="https://api.deepseek.com/v1"
 )
 
