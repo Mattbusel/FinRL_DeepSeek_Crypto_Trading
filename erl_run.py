@@ -520,7 +520,6 @@ def run():
     args.learning_rate = 2e-6
     args.batch_size = 512
     args.break_step = int(32e4)
-    args.break_step = int(32)
     args.buffer_size = int(max_step * 32)
     args.repeat_times = 2
     args.horizon_len = int(max_step * 4)

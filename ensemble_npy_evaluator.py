@@ -25,7 +25,7 @@ for filename in os.listdir(directory_path):
             final_max_drawdown = max_drawdown(returns)
             final_roma = return_over_max_drawdown(returns)
 
-            print(filename, f"sharpe: {final_sharpe_ratio}, roma: {final_roma}, max d: {}")
+            print(filename, f"sharpe: {final_sharpe_ratio}, roma: {final_roma}, max d: {final_max_drawdown}")
             
         if "correct_preds" in filename:
             print(filename, f"win rate: {np.count_nonzero(data == 1) / len(data)}, loss rate: {np.count_nonzero(data == -1) / len(data)}" )

@@ -122,9 +122,9 @@ def train_model(gpu_id: int):
                 inp, lab = seq_data.sample_for_train(batch_size=batch_size, seq_len=seq_len, device=device)
                 out, _ = net(inp)
 
-                seq_len = min(out.shape[0], lab.shape[0])
-                out = out[wup_dim:seq_len, :, :]
-                lab = lab[wup_dim:seq_len, :, :]
+                valid_out_len = min(out.shape[0], lab.shape[0])
+                out = out[wup_dim:valid_out_len, :, :]
+                lab = lab[wup_dim:valid_out_len, :, :]
                 obj = criterion(out, lab)
                 # validator.record_accuracy_tpr_fpr(out=out[wup_dim:, :, :],
                 #                                   lab=lab[wup_dim:, :, :])
