@@ -13,7 +13,8 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import pytest
-import torch
+
+torch = pytest.importorskip("torch", reason="torch not installed")
 
 from exceptions import ModelError, DataFetchError
 

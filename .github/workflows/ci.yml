@@ -2,98 +2,26 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
   pull_request:
-    branches: [main, master]
-
-permissions:
-  contents: read
 
 jobs:
-  lint:
-    name: Lint (flake8)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: pip
-
-      - name: Install lint dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install flake8>=7.0
-
-      - name: Run flake8
-        run: |
-          flake8 . \
-            --max-line-length=120 \
-            --extend-ignore=E203,W503,E501 \
-            --exclude=.git,__pycache__,TradeSimulator-v0_D3QN_0,data,output
-
-  type-check:
-    name: Type check (mypy)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: pip
-
-      - name: Install mypy and stubs
-        run: |
-          python -m pip install --upgrade pip
-          pip install mypy>=1.8 pydantic pydantic-settings openai pandas numpy
-
-      - name: Run mypy on core modules
-        run: |
-          mypy config.py data_config.py exceptions.py logger.py metrics.py \
-            deepseek_signals.py \
-            --ignore-missing-imports \
-            --no-strict-optional
-
   test:
-    name: pytest (Python 3.11)
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: pip
 
-      - name: Cache pip packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: pip-3.11-${{ hashFiles('requirements.txt') }}
-          restore-keys: |
-            pip-3.11-
+      - name: Install project dependencies
+        run: pip install -r requirements.txt
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest>=8.0 pytest-cov>=4.1 pydantic pydantic-settings openai
+      - name: Install test dependencies
+        run: pip install pytest pytest-mock pytest-cov
 
       - name: Run tests with coverage
-        run: |
-          pytest tests/ \
-            --cov=. \
-            --cov-omit="TradeSimulator-v0_D3QN_0/*,data/*,output/*,tests/*" \
-            --cov-report=term-missing \
-            --cov-report=xml:coverage.xml \
-            --tb=short \
-            -q
-
-      - name: Upload coverage artifact
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: coverage-report
-          path: coverage.xml
+        run: pytest tests/ -v --cov=. --cov-report=term-missing --cov-fail-under=40

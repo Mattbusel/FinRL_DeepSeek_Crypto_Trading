@@ -75,7 +75,7 @@ def get_logger(name: str) -> logging.Logger:
     try:
         from config import settings
         level_name = settings.log_level
-    except Exception:
+    except (ImportError, AttributeError, ValueError):
         level_name = "INFO"
 
     level = getattr(logging, level_name, logging.INFO)

@@ -1,100 +1,107 @@
-[![CI](https://github.com/mattbusel/FinRL_DeepSeek_Crypto_Trading/actions/workflows/ci.yml/badge.svg)](https://github.com/mattbusel/FinRL_DeepSeek_Crypto_Trading/actions/workflows/ci.yml)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-
 # LARSA: LLM-Augmented Regime-Switching Agent
 
-LARSA is a hybrid reinforcement learning and large language model trading system for Bitcoin.
-It extracts structured sentiment and risk signals from news articles using DeepSeek V3, feeds
-those signals through a recurrent factor model, and passes the combined feature vector to a
-D3QN-based ensemble of trading agents.
+A hybrid reinforcement learning and large language model trading system for
+Bitcoin. LARSA extracts structured sentiment and risk signals from BTC news via
+the DeepSeek V3 API, mines predictive factors with a recurrent neural network,
+and trains an ensemble of DQN-family agents that vote on trade decisions.
 
 ---
 
-## Architecture Overview
+## Architecture
 
 ```
-BTC News Articles
-       |
-       v
- deepseek_signals.py          -- DeepSeek V3 API: sentiment + risk scores
-       |
-       v
-   seq_data.py                -- Alpha-101 factor computation + CSV -> NPY
-       |
-       v
-    seq_run.py                -- RNN regression (LSTM + GRU) training on factors
-       |
-       v
-BTC_1sec_predict.npy          -- 8-dimensional factor predictions per second
-       |
-       v
- trade_simulator.py           -- Vectorised environment (TradeSimulator / EvalTradeSimulator)
-   state = [position, holding, 8 factors, sentiment, risk]
-       |
-       v
- task1_ensemble.py            -- Trains AgentD3QN, AgentDoubleDQN, AgentTwinD3QN
-       |
-       v
- task1_eval.py                -- Majority-vote ensemble evaluation, Sharpe / MDD / RoMaD
+[BTC News] -> [DeepSeek V3 Signals] -> [RNN Factor Mining] ->
+[DQN Agent] -> [Ensemble Coordinator] -> [Trade Decisions]
 ```
 
-All configuration is loaded from environment variables via `config.py` (backed by
-`pydantic-settings`). Structured JSON logs are emitted by every module through `logger.py`.
-Custom exceptions (`exceptions.py`) form a hierarchy rooted at `LARSAError`.
+Detailed module flow:
+
+```
+deepseek_signals.py         Calls DeepSeek V3 API, extracts
+(sentiment + risk JSON)     sentiment_score and risk_score per article
+        |
+        v
+seq_net.py / seq_run.py     RnnRegNet trained on Alpha101 + news signals
+(recurrent factor miner)    outputs predictive feature vectors
+        |
+        v
+erl_agent.py                AgentD3QN / AgentDoubleDQN / AgentTwinD3QN
+(DQN-family agents)         each trained independently on TradeSimulator-v0
+        |
+        v
+task1_ensemble.py           Majority-vote ensemble coordinator,
+(Ensemble class)            regime-aware signal weighting
+        |
+        v
+task1_eval.py               Backtest on held-out data, reports
+(evaluation)                Sharpe, drawdown, return metrics
+```
+
+---
+
+## Environment Variables
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `DEEPSEEK_API_KEY` | Yes | (none) | API key for the DeepSeek inference endpoint |
+| `DEEPSEEK_BASE_URL` | No | `https://api.deepseek.com/v1` | Endpoint URL |
+| `DEEPSEEK_MODEL` | No | `deepseek-chat` | Model identifier |
+| `DEEPSEEK_TEMPERATURE` | No | `0.0` | Sampling temperature |
+| `NUM_SIMS` | No | `4096` | Parallel simulation environments during training |
+| `RL_BREAK_STEP` | No | `32` | Stop training after this many steps |
+| `DATA_DIR` | No | `./data` | Directory containing price and news data |
+| `OUTPUT_DIR` | No | `./output` | Directory for model checkpoints |
+| `LOG_LEVEL` | No | `INFO` | Logging verbosity: DEBUG, INFO, WARNING, ERROR |
+
+All settings are defined in `config.py` and can be set as environment variables
+or in a `.env` file in the project root.
 
 ---
 
 ## Quickstart
 
-### Prerequisites
-
-- Python 3.10 or later
-- A DeepSeek API key (only required for signal extraction)
-
-### Installation
+### 1. Install dependencies
 
 ```bash
-git clone https://github.com/mattbusel/FinRL_DeepSeek_Crypto_Trading.git
-cd FinRL_DeepSeek_Crypto_Trading
-
-python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
-
-pip install -e ".[dev]"
-```
-
-If the editable install fails due to missing `torch` extras, install manually:
-
-```bash
+python -m venv venv
+source venv/bin/activate      # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-pip install pytest pytest-cov ruff mypy pydantic pydantic-settings openai
 ```
 
-### Run the Pipeline
-
-**Step 1 -- Extract news signals** (requires `DEEPSEEK_API_KEY`):
+### 2. Set API keys
 
 ```bash
-export DEEPSEEK_API_KEY=sk-...
+export DEEPSEEK_API_KEY="your-key-here"
+```
+
+Or create a `.env` file:
+
+```
+DEEPSEEK_API_KEY=your-key-here
+```
+
+### 3. Extract news signals
+
+```bash
 python deepseek_signals.py \
-    --input ./data/news_train.csv \
-    --output ./data/BTC_1sec_with_sentiment_risk_train.csv
+  --input ./data/news_train.csv \
+  --output ./data/news_with_signals.csv
 ```
 
-**Step 2 -- Preprocess market data and train the RNN factor model**:
+### 4. Train the RNN factor miner
 
 ```bash
-python seq_run.py          # accepts optional GPU id: python seq_run.py 0
+python seq_run.py
 ```
 
-**Step 3 -- Train the agent ensemble**:
+### 5. Train the agent ensemble
 
 ```bash
-python task1_ensemble.py   # CPU by default; pass GPU id as first arg
+python task1_ensemble.py          # CPU
+python task1_ensemble.py 0        # GPU 0
 ```
 
-**Step 4 -- Evaluate on held-out data**:
+### 6. Evaluate on held-out data
 
 ```bash
 python task1_eval.py
@@ -102,64 +109,52 @@ python task1_eval.py
 
 ---
 
-## Configuration Reference
+## Training Pipeline
 
-All settings can be overridden via environment variables.  The defaults below are active when
-the variable is not set.
+**Signal extraction** (`deepseek_signals.py`): Each news article is sent to the
+DeepSeek V3 API with a structured prompt requesting a `sentiment_score` (1-5)
+and a `risk_score` (1-5). Results are checkpointed every 10 rows so interrupted
+runs can resume. Low-confidence outputs are logged and optionally filtered.
 
-| Variable | Default | Description |
-|---|---|---|
-| `DEEPSEEK_API_KEY` | `""` | API key for the DeepSeek inference endpoint. |
-| `DEEPSEEK_BASE_URL` | `https://api.deepseek.com/v1` | DeepSeek endpoint URL. |
-| `DEEPSEEK_MODEL` | `deepseek-chat` | Model identifier. |
-| `DEEPSEEK_TEMPERATURE` | `0.0` | Sampling temperature (0 = deterministic). |
-| `MAX_RETRIES` | `5` | API retry attempts before giving up. |
-| `MIN_CONFIDENCE_THRESHOLD` | `0.3` | Minimum signal confidence to accept. |
-| `CHECKPOINT_INTERVAL` | `10` | Save a progress checkpoint every N rows. |
-| `RNN_BATCH_SIZE` | `256` | Mini-batch size for RNN training. |
-| `RNN_MID_DIM` | `128` | Hidden dimension of the RNN. |
-| `RNN_NUM_LAYERS` | `4` | Number of stacked recurrent layers. |
-| `RNN_EPOCHS` | `256` | Training epochs for the RNN. |
-| `RL_LEARNING_RATE` | `2e-6` | Learning rate for actor/critic networks. |
-| `RL_BATCH_SIZE` | `512` | Mini-batch size for RL network updates. |
-| `RL_GAMMA` | `0.995` | Discount factor for future rewards. |
-| `RL_BREAK_STEP` | `32` | Stop RL training after this many steps. |
-| `NUM_SIMS` | `4096` | Parallel simulation environments during training. |
-| `STARTING_CASH` | `1000000` | Initial cash for evaluation episodes. |
-| `DATA_DIR` | `./data` | Directory for price and news data files. |
-| `OUTPUT_DIR` | `./output` | Directory for model checkpoints and artefacts. |
-| `LOG_LEVEL` | `INFO` | Logging verbosity (DEBUG/INFO/WARNING/ERROR/CRITICAL). |
+**Factor mining** (`seq_net.py`, `seq_run.py`): An `RnnRegNet` model combines
+LSTM and GRU layers with MLP projections. It is trained on Alpha101 factors
+augmented with the DeepSeek sentiment and risk signals to predict future price
+movements. Outputs serve as the state representation for the RL agents.
+
+**Agent training** (`erl_agent.py`, `task1_ensemble.py`): Three agent
+architectures are trained independently on `TradeSimulator-v0`:
+- `AgentD3QN` (Dueling Double DQN)
+- `AgentDoubleDQN` (Double DQN with twin Q-heads)
+- `AgentTwinD3QN` (Twin-network D3QN)
+
+Each agent uses an off-policy replay buffer with soft target-network updates.
+The `Ensemble` class collects all trained agents and performs majority-vote
+action selection at evaluation time.
 
 ---
 
 ## Project Structure
 
 ```
-.
-+-- config.py                  # Pydantic-settings configuration singleton
-+-- data_config.py             # Resolved data file paths
-+-- deepseek_signals.py        # DeepSeek V3 news signal extraction pipeline
-+-- ensemble_npy_evaluator.py  # Offline NPY result evaluator
-+-- erl_agent.py               # AgentDoubleDQN, AgentD3QN, AgentTwinD3QN
-+-- erl_config.py              # Config dataclass and build_env utility
-+-- erl_evaluator.py           # Training evaluator and learning curve plotter
-+-- erl_net.py                 # QNetTwin, QNetTwinDuel, build_mlp
-+-- erl_replay_buffer.py       # Off-policy experience replay buffer
-+-- erl_run.py                 # Multi-process Learner/Worker/Evaluator pipeline
-+-- exceptions.py              # LARSAError hierarchy
-+-- logger.py                  # JSON structured logging factory
-+-- metrics.py                 # Sharpe ratio, max drawdown, RoMaD
-+-- seq_data.py                # Alpha-101 factor computation from CSV
-+-- seq_net.py                 # RnnRegNet (LSTM + GRU regression network)
-+-- seq_record.py              # RNN training evaluator and curve plotter
-+-- seq_run.py                 # RNN training and inference entry point
-+-- task1_ensemble.py          # Ensemble training pipeline
-+-- task1_eval.py              # Ensemble evaluation pipeline
-+-- trade_simulator.py         # Vectorised trade environment
-+-- tests/                     # pytest test suite
-+-- pyproject.toml             # Project metadata, dependencies, tool config
-+-- requirements.txt           # Pinned dependency list
-+-- CHANGELOG.md               # Version history
+deepseek_signals.py       DeepSeek V3 API signal extractor
+seq_net.py                RnnRegNet and NnSeqBnMLP definitions
+seq_run.py                Trains the RNN on factor + signal data
+erl_agent.py              DQN-family agent implementations
+erl_net.py                QNetTwin and QNetTwinDuel network definitions
+erl_replay_buffer.py      Off-policy replay buffer
+erl_config.py             Config dataclass and build_env helpers
+erl_evaluator.py          Training loop evaluator
+task1_ensemble.py         Ensemble training orchestration
+task1_eval.py             Backtest evaluation on test data
+trade_simulator.py        TradeSimulator-v0 environment
+config.py                 Pydantic settings (all hyperparameters)
+exceptions.py             Custom exception hierarchy (LARSAError)
+logger.py                 Structured logging setup
+metrics.py                Sharpe, Sortino, max drawdown helpers
+data_config.py            Data path configuration
+tests/                    Pytest test suite
+requirements.txt          Pinned dependencies
+pyproject.toml            Package metadata, ruff, mypy, pytest config
 ```
 
 ---
@@ -167,44 +162,14 @@ the variable is not set.
 ## Running Tests
 
 ```bash
-pytest tests/ -q --tb=short
+pip install pytest
+pytest tests/ -v
 ```
-
-With coverage:
-
-```bash
-pytest tests/ --cov=. --cov-report=term-missing -q
-```
-
----
-
-## Code Quality
-
-```bash
-# Linting
-ruff check . --select E,F,W,I,UP,B --ignore E501,B008
-
-# Type checking
-mypy --ignore-missing-imports config.py exceptions.py logger.py metrics.py
-
-# Security scan
-bandit -r . --exclude tests,output,data -ll
-```
-
----
-
-## Contributing
-
-1. Fork the repository and create a branch from `main`.
-2. Install dev dependencies: `pip install -e ".[dev]"`.
-3. Write tests for any new logic in `tests/`.
-4. Ensure `ruff check` and `pytest` pass before opening a pull request.
-5. Follow [Conventional Commits](https://www.conventionalcommits.org/) for commit messages.
 
 ---
 
 ## Contact
 
 Author: Matthew C. Busel
-Email: [mattbusel@gmail.com](mailto:mattbusel@gmail.com)
-GitHub: [github.com/mattbusel](https://github.com/mattbusel)
+Email: mattbusel@gmail.com
+GitHub: https://github.com/mattbusel

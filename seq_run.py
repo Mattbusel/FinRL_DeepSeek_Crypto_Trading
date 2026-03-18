@@ -12,7 +12,6 @@ Typical usage::
 
 from __future__ import annotations
 
-import logging
 import os
 import sys
 from typing import Optional, Tuple
@@ -21,9 +20,11 @@ import numpy as np
 import torch as th
 from torch.nn.utils import clip_grad_norm_
 
+from config import settings
+from logger import get_logger
 from seq_data import ConfigData, convert_btc_csv_to_btc_npy
 
-log = logging.getLogger(__name__)
+log = get_logger(__name__)
 
 TEN = th.Tensor
 
@@ -139,18 +140,18 @@ def train_model(gpu_id: int) -> None:
         f"cuda:{gpu_id}" if (th.cuda.is_available() and gpu_id >= 0) else "cpu"
     )
 
-    batch_size = 256
-    mid_dim = 128
-    num_layers = 4
-    epoch = 2 ** 8
-    wup_dim = 64
-    valid_gap = 128
-    num_patience = 8
-    weight_decay = 1e-4
-    learning_rate = 1e-3
-    clip_grad_norm = 2.0
+    batch_size = settings.rnn_batch_size
+    mid_dim = settings.rnn_mid_dim
+    num_layers = settings.rnn_num_layers
+    epoch = settings.rnn_epochs
+    wup_dim = settings.rnn_warmup_dim
+    valid_gap = settings.rnn_valid_gap
+    num_patience = settings.rnn_num_patience
+    weight_decay = settings.rnn_weight_decay
+    learning_rate = settings.rnn_learning_rate
+    clip_grad_norm = settings.rnn_clip_grad_norm
 
-    out_dir = "./output"
+    out_dir = settings.output_dir
 
     args = ConfigData()
     seq_data = SeqData(args=args, train_ratio=0.6)
@@ -301,10 +302,6 @@ def valid_model(gpu_id: int) -> None:
 
 
 if __name__ == "__main__":
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s %(name)s %(message)s",
-    )
     GPU_ID = int(sys.argv[1]) if len(sys.argv) > 1 else -1
     convert_btc_csv_to_btc_npy()
     train_model(gpu_id=GPU_ID)

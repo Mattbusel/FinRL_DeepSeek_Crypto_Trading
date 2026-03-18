@@ -238,9 +238,6 @@ class EnsembleEvaluator:
             max_drawdown=round(final_mdd, 4),
             return_over_max_drawdown=round(final_roma, 4),
         )
-        print(f"Sharpe Ratio: {final_sharpe}")
-        print(f"Max Drawdown: {final_mdd}")
-        print(f"Return over Max Drawdown: {final_roma}")
 
 
 def run_evaluation(save_path: str, agent_list: List[Type]) -> None:

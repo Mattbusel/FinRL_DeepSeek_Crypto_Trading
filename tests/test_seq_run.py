@@ -14,7 +14,8 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
-import torch as th
+
+th = pytest.importorskip("torch", reason="torch not installed")
 
 
 # ---------------------------------------------------------------------------

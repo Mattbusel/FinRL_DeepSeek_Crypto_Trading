@@ -12,7 +12,6 @@ Both inherit from :class:`TradeSimulator` and expose the standard
 
 from __future__ import annotations
 
-import logging
 import sys
 from typing import Dict, Optional, Tuple
 
@@ -21,8 +20,9 @@ import pandas as pd
 import torch as th
 
 from data_config import ConfigData
+from logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class TradeSimulator:
@@ -402,13 +402,13 @@ def check_simulator() -> None:
         action = th.randint(action_dim, size=(num_sims, 1), device=device)
         state, reward, done, info_dict = sim.step(action=action)
         reward_ary[:, step_i + delay_step] = reward
-        print(sim.asset)
+        logger.debug("check_simulator.step asset=%s", sim.asset.tolist())
 
-    print(reward_ary.sum(dim=1))
-    print(state.shape, num_sims, sim.state_dim)
+    logger.info("check_simulator.run1 total_reward=%s", reward_ary.sum(dim=1).tolist())
+    logger.info("check_simulator.run1 state_shape=%s", list(state.shape))
     assert state.shape == (num_sims, sim.state_dim)
 
-    print("############")
+    logger.info("check_simulator.run2 starting")
 
     reward_ary = th.zeros(
         (num_sims, sim.max_step + delay_step), dtype=th.float32, device=device
@@ -423,12 +423,13 @@ def check_simulator() -> None:
 
         state, reward, done, info_dict = sim.step(action=action)
         reward_ary[:, step_i + delay_step] = reward
-        print(sim.asset) if step_i + 2 == sim.max_step else None
+        if step_i + 2 == sim.max_step:
+            logger.debug("check_simulator.penultimate_asset=%s", sim.asset.tolist())
 
-    print(reward_ary.sum(dim=1))
-    print(state.shape, num_sims, sim.state_dim)
+    logger.info("check_simulator.run2 total_reward=%s", reward_ary.sum(dim=1).tolist())
+    logger.info("check_simulator.run2 state_shape=%s", list(state.shape))
     assert state.shape == (num_sims, sim.state_dim)
-    print()
+    logger.info("check_simulator.done")
 
 
 if __name__ == "__main__":

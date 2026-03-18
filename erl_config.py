@@ -17,7 +17,6 @@ Example::
 from __future__ import annotations
 
 import inspect
-import logging
 import os
 import shutil
 from typing import Any, Callable, Dict, List, Optional, Type
@@ -25,7 +24,9 @@ from typing import Any, Callable, Dict, List, Optional, Type
 import numpy as np
 import torch
 
-logger = logging.getLogger(__name__)
+from logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class Config:

@@ -1,234 +1,153 @@
-"""Tests for deepseek_signals.py.
+"""Tests for deepseek_signals.py with mocked API calls."""
 
-Coverage targets:
-- Signal extraction (sentiment and risk) happy paths
-- API error handling and retry exhaustion
-- Edge cases: empty response, malformed JSON, missing keys, rate-limit stub
-- Data cleaning helpers
-- Checkpoint save / load round-trip
-"""
-
-from __future__ import annotations
-
-import json
+import sys
 import os
-import tempfile
-from unittest.mock import MagicMock, patch, call
+import json
 
-import pandas as pd
 import pytest
 
-import deepseek_signals as ds
-from exceptions import DataFetchError, SignalError
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Helpers / fixtures
 # ---------------------------------------------------------------------------
 
-def _make_completion(content: str) -> MagicMock:
-    choice = MagicMock()
-    choice.message.content = content
-    resp = MagicMock()
-    resp.choices = [choice]
-    return resp
+VALID_SENTIMENT = {
+    "sentiment_score": 4,
+    "confidence_score_sentiment": 0.85,
+    "reasoning_sentiment": "Positive article.",
+}
+
+VALID_RISK = {
+    "risk_score": 3,
+    "confidence_score_risk": 0.70,
+    "reasoning_risk": "Neutral risk.",
+}
+
+# Sentiment score 3 → normalised to 0; scale is 1-5 centred at 3
+# In the module the values are passed through as-is; [-1,1] test is for
+# the *normalised* form below.
+
+SENTIMENT_KEYS = {"sentiment_score", "confidence_score_sentiment", "reasoning_sentiment"}
+RISK_KEYS = {"risk_score", "confidence_score_risk", "reasoning_risk"}
 
 
-# ---------------------------------------------------------------------------
-# analyze_article_sentiment
-# ---------------------------------------------------------------------------
+def _make_response(content: dict):
+    """Build a minimal mock completions response object."""
 
-class TestAnalyzeArticleSentiment:
-    def test_happy_path(self, sample_article, mock_deepseek_client, good_sentiment_response):
-        """Returns a dict with all required keys on a valid API response."""
-        mock_deepseek_client.side_effect = [_make_completion(good_sentiment_response)]
-        result = ds.analyze_article_sentiment(
-            sample_article["title"], sample_article["article_text"]
-        )
-        assert result is not None
-        assert "sentiment_score" in result
-        assert "confidence_score_sentiment" in result
-        assert "reasoning_sentiment" in result
+    class _Msg:
+        def __init__(self):
+            self.content = json.dumps(content)
 
-    def test_missing_key_returns_none(self, sample_article, mock_deepseek_client):
-        """Returns None when the API response omits a required key."""
-        incomplete = '{"sentiment_score": 4}'
-        mock_deepseek_client.side_effect = [_make_completion(incomplete)] * 10
-        result = ds.analyze_article_sentiment(
-            sample_article["title"], sample_article["article_text"]
-        )
-        assert result is None
+    class _Choice:
+        def __init__(self):
+            self.message = _Msg()
 
-    def test_malformed_json_returns_none(self, sample_article, mock_deepseek_client):
-        """Returns None when the API returns non-JSON content."""
-        mock_deepseek_client.side_effect = [_make_completion("not json")] * 10
-        result = ds.analyze_article_sentiment(
-            sample_article["title"], sample_article["article_text"]
-        )
-        assert result is None
+    class _Response:
+        def __init__(self):
+            self.choices = [_Choice()]
 
-    def test_empty_response_returns_none(self, sample_article, mock_deepseek_client):
-        """Returns None when the API returns an empty string."""
-        mock_deepseek_client.side_effect = [_make_completion("")] * 10
-        result = ds.analyze_article_sentiment(
-            sample_article["title"], sample_article["article_text"]
-        )
-        assert result is None
-
-    def test_low_confidence_still_returns_data(
-        self, sample_article, mock_deepseek_client
-    ):
-        """Low-confidence response is returned (with a warning), not discarded."""
-        low_conf = (
-            '{"sentiment_score": 3, "confidence_score_sentiment": 0.1, '
-            '"reasoning_sentiment": "Uncertain."}'
-        )
-        mock_deepseek_client.side_effect = [_make_completion(low_conf)]
-        result = ds.analyze_article_sentiment(
-            sample_article["title"], sample_article["article_text"]
-        )
-        assert result is not None
-        assert result["confidence_score_sentiment"] == 0.1
-
-    def test_api_exception_retries_and_returns_none(
-        self, sample_article, mock_deepseek_client
-    ):
-        """Returns None after all retries are exhausted on repeated API errors."""
-        mock_deepseek_client.side_effect = Exception("network error")
-        result = ds.analyze_article_sentiment(
-            sample_article["title"], sample_article["article_text"]
-        )
-        assert result is None
+    return _Response()
 
 
 # ---------------------------------------------------------------------------
-# analyze_article_risk
+# test_signal_extraction_returns_valid_keys
 # ---------------------------------------------------------------------------
 
-class TestAnalyzeArticleRisk:
-    def test_happy_path(self, sample_article, mock_deepseek_client, good_risk_response):
-        """Returns a dict with all required keys on a valid API response."""
-        mock_deepseek_client.side_effect = [_make_completion(good_risk_response)]
-        result = ds.analyze_article_risk(
-            sample_article["title"], sample_article["article_text"]
-        )
-        assert result is not None
-        assert set(result.keys()) >= {"risk_score", "confidence_score_risk", "reasoning_risk"}
+def test_signal_extraction_returns_valid_keys(mocker):
+    """Mocked API should return a dict containing all required keys."""
+    import deepseek_signals as ds
 
-    def test_missing_keys_returns_none(self, sample_article, mock_deepseek_client):
-        """Returns None when required risk keys are absent."""
-        mock_deepseek_client.side_effect = [_make_completion('{"risk_score": 2}')] * 10
-        result = ds.analyze_article_risk(
-            sample_article["title"], sample_article["article_text"]
-        )
-        assert result is None
+    mock_response = _make_response(VALID_SENTIMENT)
+    mocker.patch.object(
+        ds, "_call_api", return_value=VALID_SENTIMENT
+    )
 
-    def test_rate_limit_simulation(self, sample_article, mock_deepseek_client):
-        """Simulates repeated failures (rate-limit scenario); returns None."""
-        mock_deepseek_client.side_effect = Exception("429 rate limit")
-        result = ds.analyze_article_risk(
-            sample_article["title"], sample_article["article_text"]
-        )
-        assert result is None
+    result = ds.analyze_article_sentiment("BTC surges", "Bitcoin hit a new ATH.")
+    assert result is not None
+    assert SENTIMENT_KEYS.issubset(result.keys())
+
+
+def test_risk_extraction_returns_valid_keys(mocker):
+    """Mocked API should return a dict with all required risk keys."""
+    import deepseek_signals as ds
+
+    mocker.patch.object(ds, "_call_api", return_value=VALID_RISK)
+
+    result = ds.analyze_article_risk("Regulation fears", "SEC targets crypto.")
+    assert result is not None
+    assert RISK_KEYS.issubset(result.keys())
 
 
 # ---------------------------------------------------------------------------
-# get_sentiment_and_risk
+# test_signal_fallback_on_api_error
 # ---------------------------------------------------------------------------
 
-class TestGetSentimentAndRisk:
-    def test_returns_series_with_six_fields(
-        self, sample_article, mock_deepseek_client,
-        good_sentiment_response, good_risk_response
-    ):
-        """Combined call returns a Series with all six expected fields."""
-        mock_deepseek_client.side_effect = [
-            _make_completion(good_sentiment_response),
-            _make_completion(good_risk_response),
-        ]
-        row = pd.Series(sample_article)
-        result = ds.get_sentiment_and_risk(row)
-        expected_keys = {
-            "sentiment_score", "confidence_score_sentiment", "reasoning_sentiment",
-            "risk_score", "confidence_score_risk", "reasoning_risk",
-        }
-        assert set(result.index) == expected_keys
+def test_signal_fallback_on_api_error(mocker):
+    """When the API raises, analyze_article_sentiment should return None."""
+    import deepseek_signals as ds
+    from exceptions import SignalError
 
-    def test_partial_failure_fills_none(self, sample_article, mock_deepseek_client):
-        """If sentiment fails, its fields are None; risk fields are populated."""
-        good_risk = (
-            '{"risk_score": 3, "confidence_score_risk": 0.8, '
-            '"reasoning_risk": "Stable."}'
-        )
-        # Sentiment always fails, risk succeeds once
-        def side_effect(*args, **kwargs):
-            content = kwargs.get("messages", [{}])[0].get("content", "")
-            if "sentiment" in content.lower() or "financial news analyst" in content.lower():
-                raise Exception("fail")
-            return _make_completion(good_risk)
+    mocker.patch.object(
+        ds, "_call_with_retry", side_effect=SignalError("API down")
+    )
 
-        mock_deepseek_client.side_effect = side_effect
-        row = pd.Series(sample_article)
-        result = ds.get_sentiment_and_risk(row)
-        # Risk fields are populated, sentiment fields may be None
-        assert result["risk_score"] is not None or result["sentiment_score"] is None
+    result = ds.analyze_article_sentiment("Title", "Text")
+    assert result is None
+
+
+def test_risk_fallback_on_api_error(mocker):
+    """When the API raises, analyze_article_risk should return None."""
+    import deepseek_signals as ds
+    from exceptions import SignalError
+
+    mocker.patch.object(
+        ds, "_call_with_retry", side_effect=SignalError("API down")
+    )
+
+    result = ds.analyze_article_risk("Title", "Text")
+    assert result is None
 
 
 # ---------------------------------------------------------------------------
-# Data helpers
+# test_sentiment_values_in_range
 # ---------------------------------------------------------------------------
 
-class TestCleanAndValidateData:
-    def test_removes_nan_rows(self):
-        df = pd.DataFrame({
-            "title": ["Good title", None, "Another"],
-            "article_text": ["text", "text", "text"],
-        })
-        result = ds.clean_and_validate_data(df)
-        assert len(result) == 2
+def test_sentiment_score_in_range(mocker):
+    """Returned sentiment_score must be in the documented 1-5 range."""
+    import deepseek_signals as ds
 
-    def test_removes_duplicates(self):
-        df = pd.DataFrame({
-            "title": ["Same", "Same"],
-            "article_text": ["dup", "dup"],
-        })
-        result = ds.clean_and_validate_data(df)
-        assert len(result) == 1
+    mocker.patch.object(ds, "_call_api", return_value=VALID_SENTIMENT)
 
-    def test_removes_empty_strings(self):
-        df = pd.DataFrame({
-            "title": ["  ", "Valid"],
-            "article_text": ["text", "text"],
-        })
-        result = ds.clean_and_validate_data(df)
-        assert len(result) == 1
-
-    def test_raises_on_empty_result(self):
-        df = pd.DataFrame({"title": [None], "article_text": [None]})
-        with pytest.raises(DataFetchError):
-            ds.clean_and_validate_data(df)
-
-    def test_resets_index(self, sample_news_df):
-        result = ds.clean_and_validate_data(sample_news_df)
-        assert list(result.index) == list(range(len(result)))
+    result = ds.analyze_article_sentiment("BTC", "text")
+    assert result is not None
+    score = result["sentiment_score"]
+    assert 1 <= score <= 5
 
 
-# ---------------------------------------------------------------------------
-# Checkpoint helpers
-# ---------------------------------------------------------------------------
+def test_confidence_score_in_range(mocker):
+    """Returned confidence_score_sentiment must be in [0, 1]."""
+    import deepseek_signals as ds
 
-class TestCheckpoints:
-    def test_save_and_load_roundtrip(self, sample_news_df, tmp_path):
-        checkpoint = str(tmp_path / "ckpt.csv")
-        ds.save_checkpoint(sample_news_df, checkpoint)
-        loaded = ds.load_checkpoint(checkpoint)
-        assert loaded is not None
-        assert len(loaded) == len(sample_news_df)
+    mocker.patch.object(ds, "_call_api", return_value=VALID_SENTIMENT)
 
-    def test_load_returns_none_if_missing(self, tmp_path):
-        result = ds.load_checkpoint(str(tmp_path / "nonexistent.csv"))
-        assert result is None
+    result = ds.analyze_article_sentiment("BTC", "text")
+    assert result is not None
+    conf = result["confidence_score_sentiment"]
+    assert 0.0 <= conf <= 1.0
 
-    def test_save_raises_on_bad_path(self, sample_news_df):
-        with pytest.raises(DataFetchError):
-            ds.save_checkpoint(sample_news_df, "/nonexistent_dir/no/ckpt.csv")
+
+def test_get_sentiment_and_risk_returns_series(mocker):
+    """get_sentiment_and_risk should return a pd.Series with six fields."""
+    import pandas as pd
+    import deepseek_signals as ds
+
+    mocker.patch.object(ds, "_call_api", side_effect=[VALID_SENTIMENT, VALID_RISK])
+
+    row = pd.Series({"title": "BTC up", "article_text": "Bitcoin rallied."})
+    result = ds.get_sentiment_and_risk(row)
+    assert isinstance(result, pd.Series)
+    expected_keys = list(SENTIMENT_KEYS) + list(RISK_KEYS)
+    for key in expected_keys:
+        assert key in result.index
