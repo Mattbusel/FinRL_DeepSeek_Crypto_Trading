@@ -1,10 +1,26 @@
+import logging
 import os
 import torch
 from typing import Tuple
 from torch import Tensor
 
+logger = logging.getLogger(__name__)
+
 
 class ReplayBuffer:  # for off-policy
+    """Circular replay buffer for off-policy reinforcement learning.
+
+    Stores transitions from multiple parallel environment sequences (workers x
+    envs) in a single contiguous tensor, supporting uniform random sampling.
+
+    Args:
+        max_size: Maximum number of transitions to store per sequence.
+        state_dim: Dimensionality of the observation vector.
+        action_dim: Dimensionality of the action vector.
+        gpu_id: CUDA device index; ``-1`` uses CPU.
+        num_seqs: Number of parallel sequences (``num_workers * num_envs``).
+    """
+
     def __init__(self,
                  max_size: int,
                  state_dim: int,
@@ -53,6 +69,14 @@ class ReplayBuffer:  # for off-policy
         self.per_beta = None
 
     def update(self, items: Tuple[Tensor, ...]):
+        """Write a batch of transitions into the circular buffer.
+
+        Args:
+            items: Tuple of ``(states, actions, rewards, undones)`` tensors,
+                each with shape ``(horizon_len, num_seqs, *dim)``.  If the
+                batch wraps around the buffer end, items are split and written
+                to both ends.
+        """
         self.add_item = items
         states, actions, rewards, undones = items
         # assert states.shape[1:] == (env_num, state_dim)
@@ -83,6 +107,15 @@ class ReplayBuffer:  # for off-policy
         self.cur_size = self.max_size if self.if_full else self.p
 
     def sample(self, batch_size: int) -> Tuple[Tensor, Tensor, Tensor, Tensor, Tensor]:
+        """Draw a random mini-batch of transitions from the buffer.
+
+        Args:
+            batch_size: Number of transitions to sample.
+
+        Returns:
+            A tuple ``(states, actions, rewards, undones, next_states)`` where
+            each tensor has shape ``(batch_size, *dim)``.
+        """
         sample_len = self.cur_size - 1
 
         ids = torch.randint(sample_len * self.num_seqs, size=(batch_size,), requires_grad=False)
@@ -96,6 +129,14 @@ class ReplayBuffer:  # for off-policy
                 self.states[ids0 + 1, ids1],)  # next_state
 
     def save_or_load_history(self, cwd: str, if_save: bool):
+        """Persist or restore the buffer contents to/from disk.
+
+        Args:
+            cwd: Directory where ``replay_buffer_*.pth`` files are written or
+                read.
+            if_save: When ``True`` saves current buffer tensors; when ``False``
+                loads from previously saved files if all are present.
+        """
         item_names = (
             (self.states, "states"),
             (self.actions, "actions"),
@@ -110,14 +151,14 @@ class ReplayBuffer:  # for off-policy
                 else:
                     buf_item = torch.vstack((item[self.p:self.cur_size], item[0:self.p]))
                 file_path = f"{cwd}/replay_buffer_{name}.pth"
-                print(f"| buffer.save_or_load_history(): Save {file_path}")
+                logger.info("| buffer.save_or_load_history(): Save %s", file_path)
                 torch.save(buf_item, file_path)
 
         elif all([os.path.isfile(f"{cwd}/replay_buffer_{name}.pth") for item, name in item_names]):
             max_sizes = []
             for item, name in item_names:
                 file_path = f"{cwd}/replay_buffer_{name}.pth"
-                print(f"| buffer.save_or_load_history(): Load {file_path}")
+                logger.info("| buffer.save_or_load_history(): Load %s", file_path)
                 buf_item = torch.load(file_path)
 
                 max_size = buf_item.shape[0]

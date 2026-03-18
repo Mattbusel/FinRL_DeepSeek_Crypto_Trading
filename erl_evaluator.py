@@ -1,3 +1,4 @@
+import logging
 import os
 import time
 import torch.nn
@@ -7,8 +8,24 @@ from typing import Tuple, List
 
 from erl_config import Config
 
+logger = logging.getLogger(__name__)
+
 
 class Evaluator:
+    """Periodic evaluation and checkpoint manager for ElegantRL agents.
+
+    After every :attr:`eval_per_step` training steps, runs the actor in the
+    evaluation environment, logs performance statistics, and saves actor
+    checkpoints when a new highest average return is achieved.
+
+    Args:
+        cwd: Directory where model checkpoints and the recorder are saved.
+        env: Evaluation environment with ``num_envs``, ``max_step``, and
+            ``if_discrete`` attributes.
+        args: :class:`~erl_config.Config` instance providing evaluation
+            hyperparameters.
+    """
+
     def __init__(self, cwd: str, env, args: Config):
         self.cwd = cwd  # current working directory to save model
         self.env = env  # the env for Evaluator, `eval_env = env` in default
@@ -27,22 +44,35 @@ class Evaluator:
         self.recorder_path = f'{cwd}/recorder.npy'
         self.recorder = []  # total_step, r_avg, r_std, obj_c, ...
         self.max_r = -np.inf
-        print("| Evaluator:"
-              "\n| `step`: Number of samples, or total training steps, or running times of `env.step()`."
-              "\n| `time`: Time spent from the start of training to this moment."
-              "\n| `avgR`: Average value of cumulative rewards, which is the sum of rewards in an episode."
-              "\n| `stdR`: Standard dev of cumulative rewards, which is the sum of rewards in an episode."
-              "\n| `avgS`: Average of steps in an episode."
-              "\n| `objC`: Objective of Critic network. Or call it loss function of critic network."
-              "\n| `objA`: Objective of Actor network. It is the average Q value of the critic network."
-              f"\n{'#' * 80}\n"
-              f"{'ID':<3}{'Step':>8}{'Time':>8} |"
-              f"{'avgR':>8}{'stdR':>7}{'avgS':>7}{'stdS':>6} |"
-              f"{'expR':>8}{'objC':>7}{'objA':>7}{'etc.':>7}")
+        logger.info(
+            "| Evaluator:\n"
+            "| `step`: Number of samples, or total training steps, or running times of `env.step()`.\n"
+            "| `time`: Time spent from the start of training to this moment.\n"
+            "| `avgR`: Average value of cumulative rewards, which is the sum of rewards in an episode.\n"
+            "| `stdR`: Standard dev of cumulative rewards, which is the sum of rewards in an episode.\n"
+            "| `avgS`: Average of steps in an episode.\n"
+            "| `objC`: Objective of Critic network. Or call it loss function of critic network.\n"
+            "| `objA`: Objective of Actor network. It is the average Q value of the critic network.\n"
+            "%s\n%s",
+            "#" * 80,
+            f"{'ID':<3}{'Step':>8}{'Time':>8} |"
+            f"{'avgR':>8}{'stdR':>7}{'avgS':>7}{'stdS':>6} |"
+            f"{'expR':>8}{'objC':>7}{'objA':>7}{'etc.':>7}",
+        )
 
         self.prev_max_exp_r = -np.inf
 
     def evaluate_and_save(self, actor: torch.nn, steps: int, exp_r: float, logging_tuple: tuple):
+        """Evaluate the actor, log metrics, and conditionally save a checkpoint.
+
+        Args:
+            actor: The policy network to evaluate.
+            steps: Number of environment steps taken since the last call.
+            exp_r: Mean exploration reward for the current rollout window.
+            logging_tuple: Additional scalar metrics produced by
+                :meth:`~erl_agent.AgentDoubleDQN.update_net` to append to the
+                recorder (e.g. critic loss, actor objective).
+        """
         self.total_step += steps  # update total training steps
         if self.total_step < self.eval_step_counter + self.eval_per_step:
             return
@@ -63,9 +93,18 @@ class Evaluator:
         '''print some information to Terminal'''
         prev_max_r = self.max_r
         self.max_r = max(self.max_r, avg_r)  # update max average cumulative rewards
-        print(f"{self.agent_id:<3}{self.total_step:8.2e}{train_time:8.0f} |"
-              f"{avg_r:8.2f}{std_r:7.1f}{avg_s:7.0f}{std_s:6.0f} |"
-              f"{exp_r:8.2f}{''.join(f'{n:7.2f}' for n in logging_tuple)}")
+        logger.info(
+            "%s%s%s | %s%s%s%s | %s%s",
+            f"{self.agent_id:<3}",
+            f"{self.total_step:8.2e}",
+            f"{train_time:8.0f}",
+            f"{avg_r:8.2f}",
+            f"{std_r:7.1f}",
+            f"{avg_s:7.0f}",
+            f"{std_s:6.0f}",
+            f"{exp_r:8.2f}",
+            "".join(f"{n:7.2f}" for n in logging_tuple),
+        )
 
         self.save_training_curve_jpg()
 
@@ -93,6 +132,13 @@ class Evaluator:
             torch.save(actor, actor_path)  # save policy network in *.pt
 
     def save_or_load_recoder(self, if_save: bool):
+        """Persist or restore the training recorder array.
+
+        Args:
+            if_save: When ``True`` saves :attr:`recorder` to
+                :attr:`recorder_path`; when ``False`` loads from that path if
+                the file exists and restores :attr:`total_step`.
+        """
         if if_save:
             np.save(self.recorder_path, self.recorder)
         elif os.path.exists(self.recorder_path):
@@ -101,6 +147,15 @@ class Evaluator:
             self.total_step = self.recorder[-1][0]
 
     def get_cumulative_rewards_and_step(self, actor) -> Tensor:
+        """Run the actor in the eval environment and return reward/step pairs.
+
+        Args:
+            actor: Policy network used to select actions.
+
+        Returns:
+            A 2-column :class:`torch.Tensor` where column 0 is the episode
+            cumulative return and column 1 is the episode step count.
+        """
         rewards_step_list = [get_cumulative_rewards_and_step_from_vec_env(self.env, actor)
                              for _ in range(max(1, self.eval_times // self.env.num_envs))]
         rewards_step_list = sum(rewards_step_list, [])
@@ -108,6 +163,7 @@ class Evaluator:
         return rewards_step_ten  # rewards_steps_ten.shape[1] == 2
 
     def save_training_curve_jpg(self):
+        """Render and save the learning curve to ``{cwd}/LearningCurve.jpg``."""
         recorder = np.array(self.recorder)
 
         train_time = int(time.time() - self.start_time)
@@ -122,18 +178,16 @@ class Evaluator:
 
 
 def get_cumulative_rewards_and_steps(env, actor, if_render: bool = False) -> Tuple[float, int]:
-    """Usage
-    eval_times = 4
-    net_dim = 2 ** 7
-    actor_path = './LunarLanderContinuous-v2_PPO_1/actor.pt'
+    """Run a single episode and return the total return and step count.
 
-    env = build_env(env_class=env_class, env_args=env_args)
-    act = agent(net_dim, env.state_dim, env.action_dim, gpu_id=gpu_id).act
-    act.load_state_dict(torch.load(actor_path, map_location=lambda storage, loc: storage))
+    Args:
+        env: Single (non-vectorised) environment with ``max_step``,
+            ``if_discrete``, and optionally ``cumulative_returns``.
+        actor: Policy network; called with a ``(1, state_dim)`` tensor.
+        if_render: When ``True``, call ``env.render()`` each step.
 
-    r_s_ary = [get_episode_return_and_step(env, act) for _ in range(eval_times)]
-    r_s_ary = np.array(r_s_ary, dtype=np.float32)
-    r_avg, s_avg = r_s_ary.mean(axis=0)  # average of episode return and episode step
+    Returns:
+        A tuple ``(cumulative_return, steps)`` for the completed episode.
     """
     max_step = env.max_step
     if_discrete = env.if_discrete
@@ -158,13 +212,25 @@ def get_cumulative_rewards_and_steps(env, actor, if_render: bool = False) -> Tup
         if done:
             break
     else:
-        print("| get_rewards_and_step: WARNING. max_step > 12345")
+        logger.warning("| get_rewards_and_step: WARNING. max_step > 12345")
     returns = getattr(env, 'cumulative_returns', returns)
     steps += 1
     return returns, steps
 
 
 def get_cumulative_rewards_and_step_from_vec_env(env, actor) -> List[Tuple[float, int]]:
+    """Collect episode returns and lengths from a vectorised environment.
+
+    Args:
+        env: Vectorised environment with ``device``, ``num_envs``,
+            ``max_step``, ``if_discrete``, ``action_int``, ``position``,
+            and optionally ``cumulative_returns``.
+        actor: Policy network that maps state tensors to action tensors.
+
+    Returns:
+        A list of ``(cumulative_return, episode_steps)`` tuples, one per
+        completed episode across all sub-environments.
+    """
     device = env.device
     env_num = env.num_envs
     max_step = env.max_step
@@ -201,8 +267,12 @@ def get_cumulative_rewards_and_step_from_vec_env(env, actor) -> List[Tuple[float
     position_count = position_count.data.cpu().numpy() / position_ary.shape[0]
     position_count = np.ceil(position_count * 998).astype(np.int32)
 
-    print(';;;;;;', ' ' * (67 + len('[333. 218. 450.] [  0. 340. 185. 475.   0.]')),
-          action_count, position_count)
+    logger.info(
+        ";;;;;;%s%s %s",
+        " " * (67 + len("[333. 218. 450.] [  0. 340. 185. 475.   0.]")),
+        action_count,
+        position_count,
+    )
 
     '''get cumulative returns and step'''
     if hasattr(env, 'cumulative_returns'):  # GPU
@@ -231,6 +301,14 @@ def get_cumulative_rewards_and_step_from_vec_env(env, actor) -> List[Tuple[float
 def draw_learning_curve(recorder: np.ndarray = None,
                         fig_title: str = 'learning_curve',
                         save_path: str = 'learning_curve.jpg'):
+    """Render a two-panel learning curve and save it as a JPEG.
+
+    Args:
+        recorder: Array of shape ``(N, 6+)`` where columns are
+            ``[total_step, avg_r, std_r, exp_r, obj_c, obj_a, ...]``.
+        fig_title: Title string placed above the figure.
+        save_path: Destination path for the JPEG output.
+    """
     steps = recorder[:, 0]  # x-axis is training steps
     r_avg = recorder[:, 1]
     r_std = recorder[:, 2]

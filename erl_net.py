@@ -1,3 +1,17 @@
+"""Q-network architectures for ElegantRL DQN agents.
+
+Provides :class:`QNetBase`, :class:`QNetTwin` (Double DQN), and
+:class:`QNetTwinDuel` (Dueling Double DQN / D3QN), along with helper
+utilities :func:`build_mlp` and :func:`layer_init_with_orthogonal`.
+
+Example::
+
+    from erl_net import QNetTwinDuel
+    net = QNetTwinDuel(dims=[128, 128, 128], state_dim=12, action_dim=3)
+"""
+
+from __future__ import annotations
+
 import torch
 import torch.nn as nn
 
@@ -5,6 +19,15 @@ TEN = torch.Tensor
 
 
 class QNetBase(nn.Module):  # nn.Module is a standard PyTorch Network
+    """Abstract base class for all Q-network variants.
+
+    Provides shared state and value normalisation parameters.
+
+    Args:
+        state_dim: Dimensionality of the observation vector.
+        action_dim: Number of discrete actions.
+    """
+
     def __init__(self, state_dim: int, action_dim: int):
         super().__init__()
         self.explore_rate = 0.125
@@ -18,13 +41,40 @@ class QNetBase(nn.Module):  # nn.Module is a standard PyTorch Network
         self.value_std = nn.Parameter(torch.ones((1,)), requires_grad=False)
 
     def state_norm(self, state: TEN) -> TEN:
+        """Normalise a state tensor using the running mean and std.
+
+        Args:
+            state: Raw observation tensor.
+
+        Returns:
+            Normalised tensor ``(state - state_avg) / state_std``.
+        """
         return (state - self.state_avg) / self.state_std
 
     def value_re_norm(self, value: TEN) -> TEN:
+        """Re-normalise a Q-value tensor back to the original scale.
+
+        Args:
+            value: Normalised Q-value tensor.
+
+        Returns:
+            Tensor ``value * value_std + value_avg``.
+        """
         return value * self.value_std + self.value_avg
 
 
 class QNetTwin(QNetBase):  # Double DQN
+    """Twin-head Q-network for Double DQN.
+
+    Two independent value heads share a common state encoder, providing the
+    two Q-value estimates required by the Double DQN update.
+
+    Args:
+        dims: Hidden-layer widths of the shared state encoder MLP.
+        state_dim: Dimensionality of the observation vector.
+        action_dim: Number of discrete actions.
+    """
+
     def __init__(self, dims: [int], state_dim: int, action_dim: int):
         super().__init__(state_dim=state_dim, action_dim=action_dim)
         self.net_state = build_mlp(dims=[state_dim, *dims])
@@ -36,12 +86,28 @@ class QNetTwin(QNetBase):  # Double DQN
         layer_init_with_orthogonal(self.net_val2[-1], std=0.1)
 
     def forward(self, state):
+        """Compute Q-values from the first value head.
+
+        Args:
+            state: Observation tensor of shape ``(batch, state_dim)``.
+
+        Returns:
+            Q-value tensor of shape ``(batch, action_dim)``.
+        """
         state = self.state_norm(state)
         s_enc = self.net_state(state)  # encoded state
         q_val = self.net_val1(s_enc)  # q value
         return q_val  # one group of Q values
 
     def get_q1_q2(self, state):
+        """Compute re-normalised Q-values from both value heads.
+
+        Args:
+            state: Observation tensor of shape ``(batch, state_dim)``.
+
+        Returns:
+            Tuple ``(q_val1, q_val2)`` each of shape ``(batch, action_dim)``.
+        """
         state = self.state_norm(state)
         s_enc = self.net_state(state)  # encoded state
         q_val1 = self.net_val1(s_enc)  # q value 1
@@ -51,6 +117,14 @@ class QNetTwin(QNetBase):  # Double DQN
         return q_val1, q_val2  # two groups of Q values
 
     def get_action(self, state):
+        """Select an action using epsilon-greedy exploration.
+
+        Args:
+            state: Observation tensor of shape ``(batch, state_dim)``.
+
+        Returns:
+            Action index tensor of shape ``(batch, 1)``.
+        """
         state = self.state_norm(state)
         s_enc = self.net_state(state)  # encoded state
         q_val = self.net_val1(s_enc)  # q value
@@ -64,6 +138,17 @@ class QNetTwin(QNetBase):  # Double DQN
 
 
 class QNetTwinDuel(QNetBase):  # D3QN: Dueling Double DQN
+    """Dueling Double DQN network (D3QN).
+
+    Uses the dueling architecture — separate advantage and value streams —
+    combined with twin heads for Double DQN variance reduction.
+
+    Args:
+        dims: Hidden-layer widths of the shared state encoder MLP.
+        state_dim: Dimensionality of the observation vector.
+        action_dim: Number of discrete actions.
+    """
+
     def __init__(self, dims: [int], state_dim: int, action_dim: int):
         super().__init__(state_dim=state_dim, action_dim=action_dim)
         self.net_state = build_mlp(dims=[state_dim, *dims])
@@ -79,6 +164,14 @@ class QNetTwinDuel(QNetBase):  # D3QN: Dueling Double DQN
         layer_init_with_orthogonal(self.net_val2[-1], std=0.1)
 
     def forward(self, state):
+        """Compute dueling Q-values from the first head.
+
+        Args:
+            state: Observation tensor of shape ``(batch, state_dim)``.
+
+        Returns:
+            Dueling Q-value tensor of shape ``(batch, action_dim)``.
+        """
         state = self.state_norm(state)
         s_enc = self.net_state(state)  # encoded state
         q_val = self.net_val1(s_enc)  # q value
@@ -88,6 +181,14 @@ class QNetTwinDuel(QNetBase):  # D3QN: Dueling Double DQN
         return value
 
     def get_q1_q2(self, state):
+        """Compute re-normalised dueling Q-values from both heads.
+
+        Args:
+            state: Observation tensor of shape ``(batch, state_dim)``.
+
+        Returns:
+            Tuple ``(q_duel1, q_duel2)`` each of shape ``(batch, action_dim)``.
+        """
         state = self.state_norm(state)
         s_enc = self.net_state(state)  # encoded state
 
@@ -103,6 +204,14 @@ class QNetTwinDuel(QNetBase):  # D3QN: Dueling Double DQN
         return q_duel1, q_duel2  # two dueling Q values
 
     def get_action(self, state):
+        """Select an action using epsilon-greedy exploration (dueling).
+
+        Args:
+            state: Observation tensor of shape ``(batch, state_dim)``.
+
+        Returns:
+            Action index tensor of shape ``(batch, 1)``.
+        """
         state = self.state_norm(state)
         s_enc = self.net_state(state)  # encoded state
         q_val = self.net_val1(s_enc)  # q value
@@ -116,12 +225,19 @@ class QNetTwinDuel(QNetBase):  # D3QN: Dueling Double DQN
 
 
 def build_mlp(dims: [int], activation: nn = None, if_raw_out: bool = True) -> nn.Sequential:
-    """
-    build MLP (MultiLayer Perceptron)
+    """Build a Multi-Layer Perceptron as a :class:`torch.nn.Sequential`.
 
-    dims: the middle dimension, `dims[-1]` is the output dimension of this network
-    activation: the activation function
-    if_remove_out_layer: if remove the activation function of the output layer.
+    Args:
+        dims: List of layer widths; ``dims[0]`` is the input width and
+            ``dims[-1]`` is the output width.
+        activation: Activation class to insert between layers (default:
+            :class:`torch.nn.ReLU`).
+        if_raw_out: When ``True`` (default), removes the final activation so
+            the output is a raw (unbounded) linear projection.
+
+    Returns:
+        A :class:`torch.nn.Sequential` containing alternating linear and
+        activation layers.
     """
     if activation is None:
         activation = nn.ReLU
@@ -134,5 +250,12 @@ def build_mlp(dims: [int], activation: nn = None, if_raw_out: bool = True) -> nn
 
 
 def layer_init_with_orthogonal(layer, std=1.0, bias_const=1e-6):
+    """Initialise a linear layer with orthogonal weights.
+
+    Args:
+        layer: A :class:`torch.nn.Linear` layer to initialise in-place.
+        std: Gain passed to :func:`torch.nn.init.orthogonal_` (default 1.0).
+        bias_const: Constant value for bias initialisation (default 1e-6).
+    """
     torch.nn.init.orthogonal_(layer.weight, std)
     torch.nn.init.constant_(layer.bias, bias_const)

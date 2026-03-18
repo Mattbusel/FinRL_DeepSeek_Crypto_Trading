@@ -1,62 +1,88 @@
+"""ElegantRL multi-process training runner for the LARSA trading system.
+
+This module provides the :func:`train_agent` and :func:`valid_agent` entry
+points as well as the :class:`Learner`, :class:`Worker`, and
+:class:`EvaluatorProc` multiprocessing classes that together implement
+parallelised off-policy / on-policy DRL training.
+
+Typical usage::
+
+    python erl_run.py          # CPU
+    python erl_run.py 0        # GPU 0
+"""
+
+from __future__ import annotations
+
 import os
 import time
-import torch
+from multiprocessing import Pipe, Process
+from typing import Any, List, Optional, Tuple
+
 import numpy as np
-import erl_net
-import sys
+import torch
+import torch.nn as nn
 import torch.nn.modules.container as container
 import torch.nn.modules.linear as linear
-import torch.nn as nn
 
-from multiprocessing import Process, Pipe
-
+import erl_net
 from erl_config import Config, build_env
-from erl_replay_buffer import ReplayBuffer
 from erl_evaluator import Evaluator
-from trade_simulator import TradeSimulator, EvalTradeSimulator
+from erl_replay_buffer import ReplayBuffer
+from logger import get_logger
+from trade_simulator import EvalTradeSimulator, TradeSimulator
 
+log = get_logger(__name__)
 
+# Register safe globals required for torch.load with weights_only=True.
+torch.serialization.add_safe_globals(
+    [
+        erl_net.QNetBase,
+        erl_net.QNetTwin,
+        erl_net.QNetTwinDuel,
+        container.Sequential,
+        torch.nn.modules.linear.Linear,
+        torch.nn.modules.activation.ReLU,
+        torch.nn.modules.activation.Softmax,
+    ]
+)
 
-
-torch.serialization.add_safe_globals([
-    erl_net.QNetBase,
-    erl_net.QNetTwin,
-    erl_net.QNetTwinDuel,
-    container.Sequential,
-    torch.nn.modules.linear.Linear,
-    torch.nn.modules.activation.ReLU,
-    torch.nn.modules.activation.Softmax
-])
-
-#
-if os.name == "nt":  # if is WindowOS (Windows NT)
-    """Fix bug about Anaconda in WindowOS
-    OMP: Error #15: Initializing libiomp5md.dll, but found libiomp5md.dll already initialized.
-    """
+if os.name == "nt":
+    # Fix Anaconda OMP duplicate-DLL bug on Windows NT.
     os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
-
-"""run"""
 
 
 class Learner(Process):
+    """Multiprocessing learner that updates the policy network.
+
+    The Learner receives trajectory batches from :class:`Worker` processes,
+    updates the agent, and relays actors and training statistics to
+    :class:`EvaluatorProc`.
+
+    Args:
+        learner_pipe: Bidirectional pipe endpoint for the Learner side.
+        worker_pipes: List of pipe endpoints for each Worker process.
+        evaluator_pipe: Pipe endpoint shared with :class:`EvaluatorProc`.
+        args: :class:`erl_config.Config` configuration object.
+    """
+
     def __init__(
         self,
-        learner_pipe: Pipe,
-        worker_pipes: [Pipe],
-        evaluator_pipe: Pipe,
+        learner_pipe: Tuple[Any, Any],
+        worker_pipes: List[Tuple[Any, Any]],
+        evaluator_pipe: Tuple[Any, Any],
         args: Config,
-    ):
+    ) -> None:
         super().__init__()
         self.recv_pipe = learner_pipe[0]
-        self.send_pipes = [worker_pipe[1] for worker_pipe in worker_pipes]
+        self.send_pipes = [wp[1] for wp in worker_pipes]
         self.eval_pipe = evaluator_pipe[1]
         self.args = args
 
-    def run(self):
+    def run(self) -> None:
+        """Execute the learner training loop inside the child process."""
         args = self.args
         torch.set_grad_enabled(False)
 
-        """init agent"""
         agent = args.agent_class(
             args.net_dims,
             args.state_dim,
@@ -66,9 +92,8 @@ class Learner(Process):
         )
         agent.save_or_load_agent(args.cwd, if_save=False)
 
-        """init buffer"""
         if args.if_off_policy:
-            buffer = ReplayBuffer(
+            buffer: ReplayBuffer | list = ReplayBuffer(
                 gpu_id=args.gpu_id,
                 num_seqs=args.num_envs * args.num_workers,
                 max_size=args.buffer_size,
@@ -78,7 +103,6 @@ class Learner(Process):
         else:
             buffer = []
 
-        """loop"""
         if_off_policy = args.if_off_policy
         if_save_buffer = args.if_save_buffer
         num_workers = args.num_workers
@@ -110,7 +134,7 @@ class Learner(Process):
             (horizon_len, num_seqs), dtype=torch.bool, device=agent.device
         )
         if if_off_policy:
-            buffer_items_tensor = (states, actions, rewards, undones)
+            buffer_items_tensor: tuple = (states, actions, rewards, undones)
         else:
             logprobs = torch.empty(
                 (horizon_len, num_seqs), dtype=torch.float32, device=agent.device
@@ -119,83 +143,78 @@ class Learner(Process):
 
         if_train = True
         while if_train:
-            """Learner send actor to Workers"""
             for send_pipe in self.send_pipes:
                 send_pipe.send(agent.act)
 
-            """Learner receive (buffer_items, last_state) from Workers"""
             for _ in range(num_workers):
                 worker_id, buffer_items, last_state = self.recv_pipe.recv()
-
                 buf_i = worker_id * num_envs
-                buf_j = worker_id * num_envs + num_envs
-                for buffer_item, buffer_tensor in zip(
-                    buffer_items, buffer_items_tensor
-                ):
+                buf_j = buf_i + num_envs
+                for buffer_item, buffer_tensor in zip(buffer_items, buffer_items_tensor):
                     buffer_tensor[:, buf_i:buf_j] = buffer_item
                 agent.last_state[buf_i:buf_j] = last_state
 
-            """Learner update training data to (buffer, agent)"""
             if if_off_policy:
                 buffer.update(buffer_items_tensor)
             else:
                 buffer[:] = buffer_items_tensor
 
-            """agent update network using training data"""
             torch.set_grad_enabled(True)
             logging_tuple = agent.update_net(buffer)
             torch.set_grad_enabled(False)
 
-            """Learner receive training signal from Evaluator"""
-            if (
-                self.eval_pipe.poll()
-            ):  # whether there is any data available to be read of this pipe
-                if_train = (
-                    self.eval_pipe.recv()
-                )  # True means evaluator in idle moments.
-                actor = (
-                    agent.act
-                )  # so Leaner send an actor to evaluator for evaluation.
+            if self.eval_pipe.poll():
+                if_train = self.eval_pipe.recv()
+                actor: Optional[Any] = agent.act
             else:
                 actor = None
 
-            """Learner send actor and training log to Evaluator"""
-            exp_r = (
-                buffer_items_tensor[2].mean().item()
-            )  # the average rewards of exploration
+            exp_r = float(buffer_items_tensor[2].mean().item())
             self.eval_pipe.send((actor, num_steps, exp_r, logging_tuple))
 
-        """Learner send the terminal signal to workers after break the loop"""
         for send_pipe in self.send_pipes:
             send_pipe.send(None)
 
-        """save"""
         agent.save_or_load_agent(cwd, if_save=True)
         if if_save_buffer and hasattr(buffer, "save_or_load_history"):
-            print(f"| LearnerPipe.run: ReplayBuffer saving in {cwd}")
+            log.info("buffer.saving", cwd=cwd)
             buffer.save_or_load_history(cwd, if_save=True)
-            print(f"| LearnerPipe.run: ReplayBuffer saved  in {cwd}")
+            log.info("buffer.saved", cwd=cwd)
 
 
 class Worker(Process):
+    """Multiprocessing rollout worker that collects environment trajectories.
+
+    Args:
+        worker_pipe: Pipe endpoint for receiving actors from the Learner.
+        learner_pipe: Pipe endpoint for sending trajectory batches to the
+            Learner.
+        worker_id: Integer identifier of this worker (used for buffer
+            slicing on the Learner side).
+        args: :class:`erl_config.Config` configuration object.
+    """
+
     def __init__(
-        self, worker_pipe: Pipe, learner_pipe: Pipe, worker_id: int, args: Config
-    ):
+        self,
+        worker_pipe: Tuple[Any, Any],
+        learner_pipe: Tuple[Any, Any],
+        worker_id: int,
+        args: Config,
+    ) -> None:
         super().__init__()
         self.recv_pipe = worker_pipe[0]
         self.send_pipe = learner_pipe[1]
         self.worker_id = worker_id
         self.args = args
 
-    def run(self):
+    def run(self) -> None:
+        """Execute the rollout collection loop inside the child process."""
         args = self.args
         worker_id = self.worker_id
         torch.set_grad_enabled(False)
 
-        """init environment"""
         env = build_env(args.env_class, args.env_args, args.gpu_id)
 
-        """init agent"""
         agent = args.agent_class(
             args.net_dims,
             args.state_dim,
@@ -205,7 +224,6 @@ class Worker(Process):
         )
         agent.save_or_load_agent(args.cwd, if_save=False)
 
-        """init agent.last_state"""
         state = env.reset()
         if args.num_envs == 1:
             assert state.shape == (args.state_dim,)
@@ -221,53 +239,52 @@ class Worker(Process):
         assert isinstance(state, torch.Tensor)
         agent.last_state = state.detach()
 
-        """init buffer"""
         horizon_len = args.horizon_len
         if args.if_off_policy:
             buffer_items = agent.explore_env(env, args.horizon_len, if_random=True)
             self.send_pipe.send((worker_id, buffer_items, agent.last_state))
 
-        """loop"""
         del args
 
         while True:
-            """Worker receive actor from Learner"""
             actor = self.recv_pipe.recv()
             if actor is None:
                 break
-
-            """Worker send the training data to Learner"""
             agent.act = actor
             buffer_items = agent.explore_env(env, horizon_len)
             self.send_pipe.send((worker_id, buffer_items, agent.last_state))
 
-        env.close() if hasattr(env, "close") else None
+        if hasattr(env, "close"):
+            env.close()
 
 
 class EvaluatorProc(Process):
-    def __init__(self, evaluator_pipe: Pipe, args: Config):
+    """Multiprocessing evaluator that periodically tests the current policy.
+
+    Args:
+        evaluator_pipe: Pipe endpoint for communicating with the Learner.
+        args: :class:`erl_config.Config` configuration object.
+    """
+
+    def __init__(
+        self,
+        evaluator_pipe: Tuple[Any, Any],
+        args: Config,
+    ) -> None:
         super().__init__()
         self.pipe = evaluator_pipe[0]
         self.args = args
 
-    def run(self):
+    def run(self) -> None:
+        """Execute the evaluation loop inside the child process."""
         args = self.args
         torch.set_grad_enabled(False)
 
-        """wandb(weights & biases): Track and visualize all the pieces of your machine learning pipeline."""
-        # wandb = None
-        # if getattr(args, 'if_use_wandb', False):
-        #     import wandb
-        #     wandb_project_name = "train"
-        #     wandb.init(project=wandb_project_name)
-
-        """init evaluator"""
         eval_env_class = args.eval_env_class if args.eval_env_class else args.env_class
         eval_env_args = args.eval_env_args if args.eval_env_args else args.env_args
         eval_env = build_env(eval_env_class, eval_env_args, args.gpu_id)
         evaluator = Evaluator(cwd=args.cwd, env=eval_env, args=args)
 
-        """loop"""
         cwd = args.cwd
         break_step = args.break_step
         device = torch.device(
@@ -279,55 +296,52 @@ class EvaluatorProc(Process):
 
         if_train = True
         while if_train:
-            """Evaluator receive training log from Learner"""
             actor, steps, exp_r, logging_tuple = self.pipe.recv()
-            # wandb.log({"obj_cri": logging_tuple[0], "obj_act": logging_tuple[1]}) if wandb else None
 
-            """Evaluator evaluate the actor and save the training log"""
             if actor is None:
-                evaluator.total_step += (
-                    steps  # update total_step but don't update recorder
-                )
+                evaluator.total_step += steps
             else:
                 actor = actor.to(device)
                 evaluator.evaluate_and_save(actor, steps, exp_r, logging_tuple)
 
-            """Evaluator send the training signal to Learner"""
             if_train = (evaluator.total_step <= break_step) and (
                 not os.path.exists(f"{cwd}/stop")
             )
             self.pipe.send(if_train)
 
-        """Evaluator save the training log and draw the learning curve"""
         evaluator.save_training_curve_jpg()
-        print(
-            f"| UsedTime: {time.time() - evaluator.start_time:>7.0f} | SavedDir: {cwd}"
-        )
+        elapsed = time.time() - evaluator.start_time
+        log.info("training.complete", elapsed_s=round(elapsed), cwd=cwd)
 
-        eval_env.close() if hasattr(eval_env, "close") else None
+        if hasattr(eval_env, "close"):
+            eval_env.close()
 
 
-def train_agent(args: Config):
+def train_agent(args: Config) -> None:
+    """Run single-process RL training.
+
+    Initialises the environment, agent, replay buffer, and evaluator, then
+    iterates the training loop until ``break_step`` is reached or a ``stop``
+    sentinel file is created under ``args.cwd``.
+
+    Args:
+        args: Fully populated :class:`erl_config.Config` instance.
+    """
     args.init_before_training()
     torch.set_grad_enabled(False)
 
-    """init environment"""
     env = build_env(args.env_class, args.env_args, args.gpu_id)
 
-    """init agent"""
     agent = args.agent_class(
         args.net_dims, args.state_dim, args.action_dim, gpu_id=args.gpu_id, args=args
     )
     agent.save_or_load_agent(args.cwd, if_save=False)
 
-    """init agent.last_state"""
     state = env.reset()
     if args.num_envs == 1:
         assert state.shape == (args.state_dim,)
         assert isinstance(state, np.ndarray)
-        state = torch.tensor(state, dtype=torch.float32, device=agent.device).unsqueeze(
-            0
-        )
+        state = torch.tensor(state, dtype=torch.float32, device=agent.device).unsqueeze(0)
     else:
         if state.shape != (args.num_envs, args.state_dim):
             raise ValueError(
@@ -340,9 +354,8 @@ def train_agent(args: Config):
     assert isinstance(state, torch.Tensor)
     agent.last_state = state.detach()
 
-    """init buffer"""
     if args.if_off_policy:
-        buffer = ReplayBuffer(
+        buffer: ReplayBuffer | list = ReplayBuffer(
             gpu_id=args.gpu_id,
             num_seqs=args.num_envs,
             max_size=args.buffer_size,
@@ -352,17 +365,15 @@ def train_agent(args: Config):
         buffer_items = agent.explore_env(
             env, args.horizon_len * args.eval_times, if_random=True
         )
-        buffer.update(buffer_items)  # warm up for ReplayBuffer
+        buffer.update(buffer_items)
     else:
         buffer = []
 
-    """init evaluator"""
     eval_env_class = args.eval_env_class if args.eval_env_class else args.env_class
     eval_env_args = args.eval_env_args if args.eval_env_args else args.env_args
     eval_env = build_env(eval_env_class, eval_env_args, args.gpu_id)
     evaluator = Evaluator(cwd=args.cwd, env=eval_env, args=args)
 
-    """train loop"""
     cwd = args.cwd
     break_step = args.break_step
     horizon_len = args.horizon_len
@@ -380,15 +391,18 @@ def train_agent(args: Config):
         action_count = th.bincount(action).data.cpu().numpy() / action.shape[0]
         action_count = np.ceil(action_count * 998).astype(int)
 
-        position = buffer_items[0][:, :, 0].long().flatten()
-        position = position.float()  # TODO Only if on cpu
+        position = buffer_items[0][:, :, 0].long().flatten().float()
         position_count = torch.histc(
             position, bins=env.max_position * 2 + 1, min=-2, max=2
         )
         position_count = position_count.data.cpu().numpy() / position.shape[0]
         position_count = np.ceil(position_count * 998).astype(int)
 
-        print(";;;", " " * 70, action_count, position_count)
+        log.debug(
+            "train.step",
+            action_dist=action_count.tolist(),
+            position_dist=position_count.tolist(),
+        )
 
         exp_r = buffer_items[2].mean().item()
         if if_off_policy:
@@ -407,17 +421,31 @@ def train_agent(args: Config):
             not os.path.exists(f"{cwd}/stop")
         )
 
-    print(f"| UsedTime: {time.time() - evaluator.start_time:>7.0f} | SavedDir: {cwd}")
+    elapsed = time.time() - evaluator.start_time
+    log.info("training.complete", elapsed_s=round(elapsed), cwd=cwd)
 
-    env.close() if hasattr(env, "close") else None
+    if hasattr(env, "close"):
+        env.close()
     evaluator.save_training_curve_jpg()
     agent.save_or_load_agent(cwd, if_save=True)
     if if_save_buffer and hasattr(buffer, "save_or_load_history"):
         buffer.save_or_load_history(cwd, if_save=True)
 
 
-def valid_agent(args: Config):
-    cwd = f"{args.env_name}_D3QN_{args.gpu_id}"  # args.cwd
+def valid_agent(args: Config) -> None:
+    """Run a single validation episode using the best saved actor checkpoint.
+
+    Loads the newest actor file from the checkpoint directory, steps through
+    a full :class:`EvalTradeSimulator` episode, and saves position arrays to
+    ``erl_run_valid_position.npy``.
+
+    Args:
+        args: Configuration object; ``eval_env_class`` and ``eval_env_args``
+            must be set.
+    """
+    from erl_agent import AgentD3QN  # local import to avoid circular deps
+
+    cwd = f"{args.env_name}_D3QN_{args.gpu_id}"
     thresh = 0.001
 
     eval_env_class = args.eval_env_class
@@ -434,14 +462,8 @@ def valid_agent(args: Config):
 
     agent.save_or_load_agent(cwd=cwd, if_save=False)
     agent_path = sorted(
-        [
-            file
-            for file in os.listdir(cwd)
-            if len(file) == len("actor_00154050_000.664.pth")
-        ]
+        [f for f in os.listdir(cwd) if len(f) == len("actor_00154050_000.664.pth")]
     )[-1]
-    # agent_path = sorted([file for file in os.listdir(cwd)
-    #                      if len(file) == len('actor_00191970.pth')])[-1]
     agent.act.load_state_dict(
         torch.load(f"{cwd}/{agent_path}", map_location=agent.device).state_dict()
     )
@@ -450,12 +472,12 @@ def valid_agent(args: Config):
     device = agent.device
     del agent
 
-    # Define the time range
     state = sim.reset()
 
-    position_ary = []
-    trade_ary = []
-    q_values_ary = []
+    position_ary: list = []
+    trade_ary: list = []
+    q_values_ary: list = []
+
     for i in range(sim.max_step):
         tensor_state = torch.as_tensor(state, dtype=torch.float32, device=device)
         tensor_q_values = actor(tensor_state)
@@ -476,15 +498,19 @@ def valid_agent(args: Config):
         q_values_ary.append(tensor_q_values.data.cpu().numpy())
 
     save_path = "erl_run_valid_position.npy"
-    position_ary = np.stack(position_ary, axis=0)
-    np.save(save_path, position_ary)
-    print(f"| save valid_position in {save_path}")
+    position_ary_np = np.stack(position_ary, axis=0)
+    np.save(save_path, position_ary_np)
+    log.info("valid.position_saved", path=save_path)
 
 
-def run():
+def run() -> None:
+    """Configure and launch single-process training followed by validation.
+
+    GPU ID is read from the first CLI argument (default: -1 for CPU).
+    """
     import sys
 
-    gpu_id = int(sys.argv[1]) if len(sys.argv) > 1 else -1  # Get GPU_ID from command line parameters
+    gpu_id = int(sys.argv[1]) if len(sys.argv) > 1 else -1
 
     from erl_agent import AgentD3QN
 
@@ -496,12 +522,12 @@ def run():
 
     max_step = (4800 - num_ignore_step) // step_gap
 
-    env_args = {
+    env_args: dict = {
         "env_name": "TradeSimulator-v0",
         "num_envs": num_sims,
         "max_step": max_step,
-        "state_dim": 2 + 8 + 2,  # (position, holding) + factor_dim + DeepSeek engineered signals
-        "action_dim": 3,  # long, 0, short
+        "state_dim": 2 + 8 + 2,
+        "action_dim": 3,
         "if_discrete": True,
         "max_position": max_position,
         "slippage": slippage,
