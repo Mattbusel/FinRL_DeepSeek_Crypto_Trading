@@ -8,8 +8,8 @@ edge-case, and error inputs.
 from __future__ import annotations
 
 import math
-import sys
 import os
+import sys
 
 import numpy as np
 import pytest

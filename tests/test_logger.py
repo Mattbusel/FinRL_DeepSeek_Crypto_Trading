@@ -8,9 +8,7 @@ import sys
 from io import StringIO
 from unittest.mock import patch
 
-import pytest
-
-from logger import _JsonFormatter, _build_handler, get_logger
+from logger import _build_handler, _JsonFormatter, get_logger
 
 
 class TestJsonFormatter:
@@ -51,9 +49,13 @@ class TestJsonFormatter:
     def test_level_name_correct(self):
         formatter = _JsonFormatter()
         record = logging.LogRecord(
-            name="x", level=logging.ERROR,
-            pathname=__file__, lineno=1,
-            msg="err", args=(), exc_info=None,
+            name="x",
+            level=logging.ERROR,
+            pathname=__file__,
+            lineno=1,
+            msg="err",
+            args=(),
+            exc_info=None,
         )
         parsed = json.loads(formatter.format(record))
         assert parsed["level"] == "ERROR"
@@ -61,9 +63,13 @@ class TestJsonFormatter:
     def test_message_content_correct(self):
         formatter = _JsonFormatter()
         record = logging.LogRecord(
-            name="x", level=logging.DEBUG,
-            pathname=__file__, lineno=1,
-            msg="the quick brown fox", args=(), exc_info=None,
+            name="x",
+            level=logging.DEBUG,
+            pathname=__file__,
+            lineno=1,
+            msg="the quick brown fox",
+            args=(),
+            exc_info=None,
         )
         parsed = json.loads(formatter.format(record))
         assert parsed["message"] == "the quick brown fox"
@@ -72,9 +78,13 @@ class TestJsonFormatter:
         """Extra key-value pairs passed via extra= appear in the JSON output."""
         formatter = _JsonFormatter()
         record = logging.LogRecord(
-            name="x", level=logging.INFO,
-            pathname=__file__, lineno=1,
-            msg="with extras", args=(), exc_info=None,
+            name="x",
+            level=logging.INFO,
+            pathname=__file__,
+            lineno=1,
+            msg="with extras",
+            args=(),
+            exc_info=None,
         )
         record.rows = 42
         record.status = "ok"
@@ -91,9 +101,13 @@ class TestJsonFormatter:
             exc_info = sys.exc_info()
 
         record = logging.LogRecord(
-            name="x", level=logging.ERROR,
-            pathname=__file__, lineno=1,
-            msg="oops", args=(), exc_info=exc_info,
+            name="x",
+            level=logging.ERROR,
+            pathname=__file__,
+            lineno=1,
+            msg="oops",
+            args=(),
+            exc_info=exc_info,
         )
         parsed = json.loads(formatter.format(record))
         assert "exception" in parsed
@@ -105,9 +119,13 @@ class TestJsonFormatter:
 
         formatter = _JsonFormatter()
         record = logging.LogRecord(
-            name="x", level=logging.INFO,
-            pathname=__file__, lineno=1,
-            msg="ts", args=(), exc_info=None,
+            name="x",
+            level=logging.INFO,
+            pathname=__file__,
+            lineno=1,
+            msg="ts",
+            args=(),
+            exc_info=None,
         )
         parsed = json.loads(formatter.format(record))
         dt = datetime.fromisoformat(parsed["timestamp"])
@@ -173,16 +191,21 @@ class TestGetLogger:
         """get_logger must still work when config module is unavailable."""
         with patch.dict("sys.modules", {"config": None}):
             import importlib
+
             import logger as logger_mod
+
             importlib.reload(logger_mod)
             log = logger_mod.get_logger("fallback.test")
-            assert callable(getattr(log, "info"))
+            assert callable(log.info)
 
     def test_logger_level_is_set(self):
         """Logger level should be one of the standard levels."""
         log = get_logger("level.test.x")
         inner = getattr(log, "_logger", log)
         assert inner.level in (
-            logging.DEBUG, logging.INFO, logging.WARNING,
-            logging.ERROR, logging.CRITICAL,
+            logging.DEBUG,
+            logging.INFO,
+            logging.WARNING,
+            logging.ERROR,
+            logging.CRITICAL,
         )

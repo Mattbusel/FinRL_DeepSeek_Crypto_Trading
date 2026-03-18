@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import os
 from copy import deepcopy
-from typing import List, Set, Tuple
 
 import torch
 from torch import Tensor
@@ -30,7 +29,7 @@ from logger import get_logger
 log = get_logger(__name__)
 
 
-def get_optim_param(optimizer: torch.optim.Optimizer) -> List[Tensor]:
+def get_optim_param(optimizer: torch.optim.Optimizer) -> list[Tensor]:
     """Extract all parameter tensors stored in an optimiser's state dict.
 
     Args:
@@ -42,9 +41,7 @@ def get_optim_param(optimizer: torch.optim.Optimizer) -> List[Tensor]:
     """
     params_list: list = []
     for params_dict in optimizer.state_dict()["state"].values():
-        params_list.extend(
-            [t for t in params_dict.values() if isinstance(t, torch.Tensor)]
-        )
+        params_list.extend([t for t in params_dict.values() if isinstance(t, torch.Tensor)])
     return params_list
 
 
@@ -61,7 +58,7 @@ class AgentDoubleDQN:
 
     def __init__(
         self,
-        net_dims: List[int],
+        net_dims: list[int],
         state_dim: int,
         action_dim: int,
         gpu_id: int = 0,
@@ -84,20 +81,14 @@ class AgentDoubleDQN:
         self.action_dim: int = action_dim
         self.last_state: Tensor | None = None
         self.device = torch.device(
-            f"cuda:{gpu_id}"
-            if (torch.cuda.is_available() and gpu_id >= 0)
-            else "cpu"
+            f"cuda:{gpu_id}" if (torch.cuda.is_available() and gpu_id >= 0) else "cpu"
         )
 
         act_class = getattr(self, "act_class", None)
         cri_class = getattr(self, "cri_class", None)
-        self.act = self.act_target = act_class(net_dims, state_dim, action_dim).to(
-            self.device
-        )
+        self.act = self.act_target = act_class(net_dims, state_dim, action_dim).to(self.device)
         self.cri = self.cri_target = (
-            cri_class(net_dims, state_dim, action_dim).to(self.device)
-            if cri_class
-            else self.act
+            cri_class(net_dims, state_dim, action_dim).to(self.device) if cri_class else self.act
         )
 
         self.act_optimizer = torch.optim.AdamW(self.act.parameters(), self.learning_rate)
@@ -113,7 +104,7 @@ class AgentDoubleDQN:
 
         self.criterion = torch.nn.SmoothL1Loss(reduction="mean")
 
-        self.save_attr_names: Set[str] = {
+        self.save_attr_names: set[str] = {
             "act",
             "act_target",
             "act_optimizer",
@@ -125,9 +116,7 @@ class AgentDoubleDQN:
         self.act_target = self.cri_target = deepcopy(self.act)
         self.act.explore_rate = getattr(args, "explore_rate", 1 / 32)
 
-    def get_obj_critic(
-        self, buffer: ReplayBuffer, batch_size: int
-    ) -> Tuple[Tensor, Tensor]:
+    def get_obj_critic(self, buffer: ReplayBuffer, batch_size: int) -> tuple[Tensor, Tensor]:
         """Compute critic loss using uniform replay sampling (Double DQN).
 
         Args:
@@ -148,10 +137,7 @@ class AgentDoubleDQN:
             )
             q_labels = rewards + undones * self.gamma * next_qs
 
-        q1, q2 = [
-            qs.gather(1, actions.long()).squeeze(1)
-            for qs in self.act.get_q1_q2(states)
-        ]
+        q1, q2 = [qs.gather(1, actions.long()).squeeze(1) for qs in self.act.get_q1_q2(states)]
         obj_critic = self.criterion(q1, q_labels) + self.criterion(q2, q_labels)
         return obj_critic, q1
 
@@ -177,7 +163,7 @@ class AgentDoubleDQN:
 
     def explore_env(
         self, env: object, horizon_len: int, if_random: bool = False
-    ) -> Tuple[Tensor, ...]:
+    ) -> tuple[Tensor, ...]:
         """Collect trajectories by interacting with a vectorised environment.
 
         Args:
@@ -193,18 +179,12 @@ class AgentDoubleDQN:
             * ``rewards`` shape ``(horizon_len, num_envs)``
             * ``undones`` shape ``(horizon_len, num_envs)``
         """
-        states = torch.zeros(
-            (horizon_len, self.num_envs, self.state_dim), dtype=torch.float32
-        ).to(self.device)
-        actions = torch.zeros(
-            (horizon_len, self.num_envs, 1), dtype=torch.int32
-        ).to(self.device)
-        rewards = torch.zeros(
-            (horizon_len, self.num_envs), dtype=torch.float32
-        ).to(self.device)
-        dones = torch.zeros(
-            (horizon_len, self.num_envs), dtype=torch.bool
-        ).to(self.device)
+        states = torch.zeros((horizon_len, self.num_envs, self.state_dim), dtype=torch.float32).to(
+            self.device
+        )
+        actions = torch.zeros((horizon_len, self.num_envs, 1), dtype=torch.int32).to(self.device)
+        rewards = torch.zeros((horizon_len, self.num_envs), dtype=torch.float32).to(self.device)
+        dones = torch.zeros((horizon_len, self.num_envs), dtype=torch.bool).to(self.device)
 
         state = self.last_state
         get_action = self.act_target.get_action
@@ -225,7 +205,7 @@ class AgentDoubleDQN:
         undones = 1.0 - dones.type(torch.float32)
         return states, actions, rewards, undones
 
-    def update_net(self, buffer: ReplayBuffer) -> Tuple[float, float]:
+    def update_net(self, buffer: ReplayBuffer) -> tuple[float, float]:
         """Perform one round of network updates from replay buffer data.
 
         Args:
@@ -239,9 +219,9 @@ class AgentDoubleDQN:
             states, actions, rewards, undones = buffer.add_item
             self.update_avg_std_for_normalization(
                 states=states.reshape((-1, self.state_dim)),
-                returns=self.get_cumulative_rewards(
-                    rewards=rewards, undones=undones
-                ).reshape((-1,)),
+                returns=self.get_cumulative_rewards(rewards=rewards, undones=undones).reshape(
+                    (-1,)
+                ),
             )
 
         obj_critics = 0.0
@@ -256,9 +236,7 @@ class AgentDoubleDQN:
             self.soft_update(self.cri_target, self.cri, self.soft_update_tau)
         return obj_critics / update_times, obj_actors / update_times
 
-    def get_obj_critic_raw(
-        self, buffer: ReplayBuffer, batch_size: int
-    ) -> Tuple[Tensor, Tensor]:
+    def get_obj_critic_raw(self, buffer: ReplayBuffer, batch_size: int) -> tuple[Tensor, Tensor]:
         """Compute critic loss using uniform sampling (single-head variant).
 
         Args:
@@ -270,9 +248,7 @@ class AgentDoubleDQN:
         """
         with torch.no_grad():
             states, actions, rewards, undones, next_ss = buffer.sample(batch_size)
-            next_qs = (
-                self.cri_target(next_ss).max(dim=1, keepdim=True)[0].squeeze(1)
-            )
+            next_qs = self.cri_target(next_ss).max(dim=1, keepdim=True)[0].squeeze(1)
             q_labels = rewards + undones * self.gamma * next_qs
 
         q_values = self.cri(states).gather(1, actions.long()).squeeze(1)
@@ -280,9 +256,7 @@ class AgentDoubleDQN:
         return obj_critic, q_values
 
     @staticmethod
-    def soft_update(
-        target_net: torch.nn.Module, current_net: torch.nn.Module, tau: float
-    ) -> None:
+    def soft_update(target_net: torch.nn.Module, current_net: torch.nn.Module, tau: float) -> None:
         """Perform a soft (Polyak) update of *target_net* from *current_net*.
 
         Args:
@@ -293,9 +267,7 @@ class AgentDoubleDQN:
         for tar, cur in zip(target_net.parameters(), current_net.parameters()):
             tar.data.copy_(cur.data * tau + tar.data * (1.0 - tau))
 
-    def optimizer_update(
-        self, optimizer: torch.optim.Optimizer, objective: Tensor
-    ) -> None:
+    def optimizer_update(self, optimizer: torch.optim.Optimizer, objective: Tensor) -> None:
         """Back-propagate *objective* and step *optimizer* with gradient clipping.
 
         Args:
@@ -310,9 +282,7 @@ class AgentDoubleDQN:
         )
         optimizer.step()
 
-    def get_cumulative_rewards(
-        self, rewards: Tensor, undones: Tensor
-    ) -> Tensor:
+    def get_cumulative_rewards(self, rewards: Tensor, undones: Tensor) -> Tensor:
         """Compute discounted cumulative returns via reverse scan.
 
         Args:
@@ -327,16 +297,12 @@ class AgentDoubleDQN:
         horizon_len = rewards.shape[0]
 
         last_state = self.last_state
-        next_value = (
-            self.act_target(last_state).argmax(dim=1).detach()
-        )
+        next_value = self.act_target(last_state).argmax(dim=1).detach()
         for t in range(horizon_len - 1, -1, -1):
             returns[t] = next_value = rewards[t] + masks[t] * next_value
         return returns
 
-    def update_avg_std_for_normalization(
-        self, states: Tensor, returns: Tensor
-    ) -> None:
+    def update_avg_std_for_normalization(self, states: Tensor, returns: Tensor) -> None:
         """Update running mean/std used for state and value normalisation.
 
         Uses an exponential moving average controlled by
@@ -380,7 +346,7 @@ class AgentD3QN(AgentDoubleDQN):
 
     def __init__(
         self,
-        net_dims: List[int],
+        net_dims: list[int],
         state_dim: int,
         action_dim: int,
         gpu_id: int = 0,
@@ -412,7 +378,7 @@ class AgentTwinD3QN(AgentDoubleDQN):
 
     def __init__(
         self,
-        net_dims: List[int],
+        net_dims: list[int],
         state_dim: int,
         action_dim: int,
         gpu_id: int = 0,

@@ -1,10 +1,10 @@
 import logging
 import os
 import time
-import torch.nn
+
 import numpy as np
+import torch.nn
 from torch import Tensor
-from typing import Tuple, List
 
 from erl_config import Config
 
@@ -34,14 +34,16 @@ class Evaluator:
         self.start_time = time.time()  # `used_time = time.time() - self.start_time`
         self.eval_times = args.eval_times  # number of times that get episodic cumulative return
         self.eval_per_step = args.eval_per_step  # evaluate the agent per training steps
-        self.eval_step_counter = -self.eval_per_step  # `self.total_step > self.eval_step_counter + self.eval_per_step`
+        self.eval_step_counter = (
+            -self.eval_per_step
+        )  # `self.total_step > self.eval_step_counter + self.eval_per_step`
 
         self.save_gap = args.save_gap
         self.save_counter = 0
         self.if_keep_save = args.if_keep_save
         self.if_over_write = args.if_over_write
 
-        self.recorder_path = f'{cwd}/recorder.npy'
+        self.recorder_path = f"{cwd}/recorder.npy"
         self.recorder = []  # total_step, r_avg, r_std, obj_c, ...
         self.max_r = -np.inf
         logger.info(
@@ -88,9 +90,11 @@ class Evaluator:
         std_s = steps.std().item()
 
         train_time = int(time.time() - self.start_time)
-        self.recorder.append((self.total_step, avg_r, std_r, exp_r, *logging_tuple))  # update recorder
+        self.recorder.append(
+            (self.total_step, avg_r, std_r, exp_r, *logging_tuple)
+        )  # update recorder
 
-        '''print some information to Terminal'''
+        """print some information to Terminal"""
         prev_max_r = self.max_r
         self.max_r = max(self.max_r, avg_r)  # update max average cumulative rewards
         logger.info(
@@ -156,8 +160,10 @@ class Evaluator:
             A 2-column :class:`torch.Tensor` where column 0 is the episode
             cumulative return and column 1 is the episode step count.
         """
-        rewards_step_list = [get_cumulative_rewards_and_step_from_vec_env(self.env, actor)
-                             for _ in range(max(1, self.eval_times // self.env.num_envs))]
+        rewards_step_list = [
+            get_cumulative_rewards_and_step_from_vec_env(self.env, actor)
+            for _ in range(max(1, self.eval_times // self.env.num_envs))
+        ]
         rewards_step_list = sum(rewards_step_list, [])
         rewards_step_ten = torch.tensor(rewards_step_list)
         return rewards_step_ten  # rewards_steps_ten.shape[1] == 2
@@ -170,14 +176,16 @@ class Evaluator:
         total_step = int(self.recorder[-1][0])
         fig_title = f"step_time_maxR_{int(total_step)}_{int(train_time)}_{self.max_r:.3f}"
 
-        draw_learning_curve(recorder=recorder, fig_title=fig_title, save_path=f"{self.cwd}/LearningCurve.jpg")
+        draw_learning_curve(
+            recorder=recorder, fig_title=fig_title, save_path=f"{self.cwd}/LearningCurve.jpg"
+        )
         np.save(self.recorder_path, recorder)  # save self.recorder for `draw_learning_curve()`
 
 
 """util"""
 
 
-def get_cumulative_rewards_and_steps(env, actor, if_render: bool = False) -> Tuple[float, int]:
+def get_cumulative_rewards_and_steps(env, actor, if_render: bool = False) -> tuple[float, int]:
     """Run a single episode and return the total return and step count.
 
     Args:
@@ -201,7 +209,9 @@ def get_cumulative_rewards_and_steps(env, actor, if_render: bool = False) -> Tup
         tensor_action = actor(tensor_state)
         if if_discrete:
             tensor_action = tensor_action.argmax(dim=1)
-        action = tensor_action.detach().cpu().numpy()[0]  # not need detach(), because using torch.no_grad() outside
+        action = (
+            tensor_action.detach().cpu().numpy()[0]
+        )  # not need detach(), because using torch.no_grad() outside
         state, reward, done, _ = env.step(action)
         returns += reward
 
@@ -213,12 +223,12 @@ def get_cumulative_rewards_and_steps(env, actor, if_render: bool = False) -> Tup
             break
     else:
         logger.warning("| get_rewards_and_step: WARNING. max_step > 12345")
-    returns = getattr(env, 'cumulative_returns', returns)
+    returns = getattr(env, "cumulative_returns", returns)
     steps += 1
     return returns, steps
 
 
-def get_cumulative_rewards_and_step_from_vec_env(env, actor) -> List[Tuple[float, int]]:
+def get_cumulative_rewards_and_step_from_vec_env(env, actor) -> list[tuple[float, int]]:
     """Collect episode returns and lengths from a vectorised environment.
 
     Args:
@@ -236,7 +246,7 @@ def get_cumulative_rewards_and_step_from_vec_env(env, actor) -> List[Tuple[float
     max_step = env.max_step
     if_discrete = env.if_discrete
 
-    '''get returns and dones (GPU)'''
+    """get returns and dones (GPU)"""
     returns = torch.empty((max_step, env_num), dtype=torch.float32, device=device)
     dones = torch.empty((max_step, env_num), dtype=torch.bool, device=device)
     action_ints = []
@@ -256,7 +266,7 @@ def get_cumulative_rewards_and_step_from_vec_env(env, actor) -> List[Tuple[float
         positions.append(env.position)
 
     action_ary = torch.concatenate(action_ints, dim=0)
-    action_ary = action_ary.float() # TODO for cpu only
+    action_ary = action_ary.float()  # TODO for cpu only
     action_count = torch.histc(action_ary, bins=2 + 1, min=-1, max=1)
     action_count = action_count.data.cpu().numpy() / action_ary.shape[0]
     action_count = np.ceil(action_count * 998).astype(np.int32)
@@ -274,8 +284,8 @@ def get_cumulative_rewards_and_step_from_vec_env(env, actor) -> List[Tuple[float
         position_count,
     )
 
-    '''get cumulative returns and step'''
-    if hasattr(env, 'cumulative_returns'):  # GPU
+    """get cumulative returns and step"""
+    if hasattr(env, "cumulative_returns"):  # GPU
         returns_step_list = [(ret, env.max_step) for ret in env.cumulative_returns]
     else:  # CPU
         returns = returns.cpu()
@@ -298,9 +308,11 @@ def get_cumulative_rewards_and_step_from_vec_env(env, actor) -> List[Tuple[float
     return returns_step_list
 
 
-def draw_learning_curve(recorder: np.ndarray = None,
-                        fig_title: str = 'learning_curve',
-                        save_path: str = 'learning_curve.jpg'):
+def draw_learning_curve(
+    recorder: np.ndarray = None,
+    fig_title: str = "learning_curve",
+    save_path: str = "learning_curve.jpg",
+):
     """Render a two-panel learning curve and save it as a JPEG.
 
     Args:
@@ -316,55 +328,69 @@ def draw_learning_curve(recorder: np.ndarray = None,
     obj_c = recorder[:, 4]
     obj_a = recorder[:, 5]
 
-    '''plot subplots'''
+    """plot subplots"""
     import matplotlib as mpl
-    mpl.use('Agg')
+
+    mpl.use("Agg")
     """Generating matplotlib graphs without a running X server [duplicate]
     write `mpl.use('Agg')` before `import matplotlib.pyplot as plt`
     https://stackoverflow.com/a/4935945/9293137
     """
 
     import matplotlib.pyplot as plt
+
     fig, axs = plt.subplots(2)
 
-    '''axs[0]'''
+    """axs[0]"""
     ax00 = axs[0]
     ax00.cla()
 
     ax01 = axs[0].twinx()
-    color01 = 'darkcyan'
-    ax01.set_ylabel('Explore AvgReward', color=color01)
-    ax01.plot(steps, r_exp, color=color01, alpha=0.5, )
-    ax01.tick_params(axis='y', labelcolor=color01)
+    color01 = "darkcyan"
+    ax01.set_ylabel("Explore AvgReward", color=color01)
+    ax01.plot(
+        steps,
+        r_exp,
+        color=color01,
+        alpha=0.5,
+    )
+    ax01.tick_params(axis="y", labelcolor=color01)
 
-    color0 = 'lightcoral'
-    ax00.set_ylabel('Episode Return', color=color0)
-    ax00.plot(steps, r_avg, label='Episode Return', color=color0)
+    color0 = "lightcoral"
+    ax00.set_ylabel("Episode Return", color=color0)
+    ax00.plot(steps, r_avg, label="Episode Return", color=color0)
     ax00.fill_between(steps, r_avg - r_std / 2, r_avg + r_std / 2, facecolor=color0, alpha=0.3)
     ax00.grid()
-    '''axs[1]'''
+    """axs[1]"""
     ax10 = axs[1]
     ax10.cla()
 
     ax11 = axs[1].twinx()
-    color11 = 'darkcyan'
-    ax11.set_ylabel('objC', color=color11)
-    ax11.fill_between(steps, obj_c, facecolor=color11, alpha=0.2, )
-    ax11.tick_params(axis='y', labelcolor=color11)
+    color11 = "darkcyan"
+    ax11.set_ylabel("objC", color=color11)
+    ax11.fill_between(
+        steps,
+        obj_c,
+        facecolor=color11,
+        alpha=0.2,
+    )
+    ax11.tick_params(axis="y", labelcolor=color11)
 
-    color10 = 'royalblue'
-    ax10.set_xlabel('Total Steps')
-    ax10.set_ylabel('objA', color=color10)
-    ax10.plot(steps, obj_a, label='objA', color=color10)
-    ax10.tick_params(axis='y', labelcolor=color10)
+    color10 = "royalblue"
+    ax10.set_xlabel("Total Steps")
+    ax10.set_ylabel("objA", color=color10)
+    ax10.plot(steps, obj_a, label="objA", color=color10)
+    ax10.tick_params(axis="y", labelcolor=color10)
     for plot_i in range(6, recorder.shape[1]):
         other = recorder[:, plot_i]
-        ax10.plot(steps, other, label=f'{plot_i}', color='grey', alpha=0.5)
+        ax10.plot(steps, other, label=f"{plot_i}", color="grey", alpha=0.5)
     ax10.legend()
     ax10.grid()
 
-    '''plot save'''
+    """plot save"""
     plt.title(fig_title, y=2.3)
     plt.savefig(save_path)
-    plt.close('all')  # avoiding warning about too many open figures, rcParam `figure.max_open_warning`
+    plt.close(
+        "all"
+    )  # avoiding warning about too many open figures, rcParam `figure.max_open_warning`
     # plt.show()  # if use `mpl.use('Agg')` to draw figures without GUI, then plt can't plt.show()

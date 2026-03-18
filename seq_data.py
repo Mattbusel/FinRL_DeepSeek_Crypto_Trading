@@ -3,9 +3,7 @@ import time
 
 import numpy as np
 import pandas as pd
-from numpy import abs
-from numpy import log
-from numpy import sign
+from numpy import abs, log, sign
 from scipy.stats import rankdata
 
 
@@ -19,6 +17,7 @@ class ConfigData:
 
         self.predict_ary_path = f"{data_dir}/BTC_1sec_predict.npy"
         self.predict_net_path = f"{data_dir}/BTC_1sec_predict.pth"
+
 
 def convert_csv_to_level5_csv():
     """Convert a raw BTC order-book CSV to a level-5 order-book CSV.
@@ -43,14 +42,26 @@ def convert_csv_to_level5_csv():
     ]
     num_levels = 5  # Only use levels 0–4, ignore levels 0–15 from the original data
     for i in range(0, num_levels):
-        df_columns.append(f"bids_distance_{i}")  # Difference between the bid price at level {i} and the midpoint price
-        df_columns.append(f"asks_distance_{i}")  # Difference between the ask price at level {i} and the midpoint price
+        df_columns.append(
+            f"bids_distance_{i}"
+        )  # Difference between the bid price at level {i} and the midpoint price
+        df_columns.append(
+            f"asks_distance_{i}"
+        )  # Difference between the ask price at level {i} and the midpoint price
         df_columns.append(f"bids_notional_{i}")  # Total value of unfilled bid orders at level {i}
         df_columns.append(f"asks_notional_{i}")  # Total value of unfilled ask orders at level {i}
-        df_columns.append(f"bids_cancel_notional_{i}")  # Total value of canceled bid orders at level {i}
-        df_columns.append(f"asks_cancel_notional_{i}")  # Total value of canceled ask orders at level {i}
-        df_columns.append(f"bids_limit_notional_{i}")  # Total value of unfilled bid limit orders at level {i}
-        df_columns.append(f"asks_limit_notional_{i}")  # Total value of unfilled ask limit orders at level {i}
+        df_columns.append(
+            f"bids_cancel_notional_{i}"
+        )  # Total value of canceled bid orders at level {i}
+        df_columns.append(
+            f"asks_cancel_notional_{i}"
+        )  # Total value of canceled ask orders at level {i}
+        df_columns.append(
+            f"bids_limit_notional_{i}"
+        )  # Total value of unfilled bid limit orders at level {i}
+        df_columns.append(
+            f"asks_limit_notional_{i}"
+        )  # Total value of unfilled ask limit orders at level {i}
 
     df = df[df_columns]
     df = df.sort_values(by="system_time")
@@ -83,7 +94,9 @@ def check_btc_1s_csv():
     if not invalid_pairs.empty:
         print("There are adjacent time pairs with a time difference greater than 2 seconds:")
         for prev_time, curr_time in zip(invalid_pairs.shift(), invalid_pairs):
-            print(f"Previous time: {prev_time}, Current time: {curr_time}, Time difference: {curr_time - prev_time}")
+            print(
+                f"Previous time: {prev_time}, Current time: {curr_time}, Time difference: {curr_time - prev_time}"
+            )
     else:
         print("All adjacent time differences are within 2 seconds")
 
@@ -339,7 +352,7 @@ class TechIndicator:
         self.num_asks = df["sells"]
         self.num_bids = df["buys"]
 
-        self.best_bid = self.vwap *(1 + df["bids_distance_3"])  # The best/highest bid price
+        self.best_bid = self.vwap * (1 + df["bids_distance_3"])  # The best/highest bid price
         self.best_ask = self.vwap * (1 + df["asks_distance_3"])  # The best/lowest ask price
         self.mid_price = (self.best_bid + self.best_ask) / 2
         self.bid_volume = df["bids_notional_3"]  # The best/highest bid volume
@@ -394,7 +407,9 @@ class TechIndicator:
 
     # Alpha#5
     def alpha005(self):
-        return rank((self.best_bid - (ts_sum(self.vwap, 10) / 10))) * (-1 * abs(rank((self.mid_price - self.vwap))))
+        return rank(self.best_bid - (ts_sum(self.vwap, 10) / 10)) * (
+            -1 * abs(rank(self.mid_price - self.vwap))
+        )
 
     # Alpha#6
     def alpha006(self):
@@ -412,10 +427,8 @@ class TechIndicator:
     def alpha008(self):
         return -1 * (
             rank(
-                (
-                    (ts_sum(self.best_bid, 5) * ts_sum(self.returns, 5))
-                    - delay((ts_sum(self.best_bid, 5) * ts_sum(self.returns, 5)), 10)
-                )
+                (ts_sum(self.best_bid, 5) * ts_sum(self.returns, 5))
+                - delay((ts_sum(self.best_bid, 5) * ts_sum(self.returns, 5)), 10)
             )
         )
 
@@ -439,9 +452,10 @@ class TechIndicator:
 
     # Alpha#11
     def alpha011(self):
-        return (rank(ts_max((self.vwap - self.mid_price), 3)) + rank(ts_min((self.vwap - self.mid_price), 3))) * rank(
-            df_delta(self.ask_volume, 3)
-        )
+        return (
+            rank(ts_max((self.vwap - self.mid_price), 3))
+            + rank(ts_min((self.vwap - self.mid_price), 3))
+        ) * rank(df_delta(self.ask_volume, 3))
 
     # Alpha#12
     def alpha012(self):
@@ -480,13 +494,21 @@ class TechIndicator:
     def alpha018(self):
         df = correlation(self.mid_price, self.best_bid, 10)
         df = df.replace([-np.inf, np.inf], 0).fillna(value=0)
-        return -1 * (rank((stddev(abs((self.mid_price - self.best_bid)), 5) + (self.mid_price - self.best_bid)) + df))
+        return -1 * (
+            rank(
+                (
+                    stddev(abs((self.mid_price - self.best_bid)), 5)
+                    + (self.mid_price - self.best_bid)
+                )
+                + df
+            )
+        )
 
     # Alpha#19
     def alpha019(self):
-        return (-1 * sign((self.mid_price - delay(self.mid_price, 7)) + df_delta(self.mid_price, 7))) * (
-            1 + rank(1 + ts_sum(self.returns, 250))
-        )
+        return (
+            -1 * sign((self.mid_price - delay(self.mid_price, 7)) + df_delta(self.mid_price, 7))
+        ) * (1 + rank(1 + ts_sum(self.returns, 250)))
 
     # Alpha#20
     def alpha020(self):
@@ -531,7 +553,7 @@ class TechIndicator:
     # Alpha#25
     def alpha025(self):
         adv20 = sma(self.ask_volume, 20)
-        return rank(((((-1 * self.returns) * adv20) * self.vwap) * (self.best_ask - self.mid_price)))
+        return rank((((-1 * self.returns) * adv20) * self.vwap) * (self.best_ask - self.mid_price))
 
     # Alpha#26
     def alpha026(self):
@@ -541,7 +563,7 @@ class TechIndicator:
 
     # Alpha#27
     def alpha027(self):
-        alpha = rank((sma(correlation(rank(self.bid_volume), rank(self.best_bid), 6), 2) / 2.0))
+        alpha = rank(sma(correlation(rank(self.bid_volume), rank(self.best_bid), 6), 2) / 2.0)
         alpha[alpha > 0.5] = -1
         alpha[alpha <= 0.5] = 1
         return alpha
@@ -567,22 +589,26 @@ class TechIndicator:
     # Alpha#30
     def alpha030(self):
         delta_midprice = df_delta(self.mid_price, 1)
-        inner = sign(delta_midprice) + sign(delay(delta_midprice, 1)) + sign(delay(delta_midprice, 2))
+        inner = (
+            sign(delta_midprice) + sign(delay(delta_midprice, 1)) + sign(delay(delta_midprice, 2))
+        )
         return ((1.0 - rank(inner)) * ts_sum(self.ask_volume, 5)) / ts_sum(self.ask_volume, 20)
 
     # Alpha#31
     def alpha031(self):
         adv20 = sma(self.bid_volume, 20)
         df = correlation(adv20, self.best_bid, 12).replace([-np.inf, np.inf], 0).fillna(value=0)
-        p1 = rank(rank(rank(decay_linear((-1 * rank(rank(df_delta(self.mid_price, 10)))).to_frame(), 10))))
-        p2 = rank((-1 * df_delta(self.mid_price, 3)))
+        p1 = rank(
+            rank(rank(decay_linear((-1 * rank(rank(df_delta(self.mid_price, 10)))).to_frame(), 10)))
+        )
+        p2 = rank(-1 * df_delta(self.mid_price, 3))
         p3 = sign(scale(df))
 
         return p1.LWMA + p2 + p3
 
     # Alpha#32
     def alpha032(self):
-        return scale(((sma(self.mid_price, 7) / 7) - self.mid_price)) + (
+        return scale((sma(self.mid_price, 7) / 7) - self.mid_price) + (
             20 * scale(correlation(self.vwap, delay(self.mid_price, 5), 230))
         )
 
@@ -637,9 +663,9 @@ class TechIndicator:
 
     # Alpha#37
     def alpha037(self):
-        return rank(correlation(delay(self.best_ask - self.mid_price, 1), self.mid_price, 200)) + rank(
-            self.best_ask - self.mid_price
-        )
+        return rank(
+            correlation(delay(self.best_ask - self.mid_price, 1), self.mid_price, 200)
+        ) + rank(self.best_ask - self.mid_price)
 
     # Alpha#38
     def alpha038(self):
@@ -653,13 +679,16 @@ class TechIndicator:
         return (
             -1
             * rank(
-                df_delta(self.mid_price, 7) * (1 - rank(decay_linear((self.ask_volume / adv20).to_frame(), 9).LWMA))
+                df_delta(self.mid_price, 7)
+                * (1 - rank(decay_linear((self.ask_volume / adv20).to_frame(), 9).LWMA))
             )
         ) * (1 + rank(sma(self.returns, 250)))
 
     # Alpha#40
     def alpha040(self):
-        return -1 * rank(stddev(self.best_bid, 10)) * correlation(self.best_bid, self.bid_volume, 10)
+        return (
+            -1 * rank(stddev(self.best_bid, 10)) * correlation(self.best_bid, self.bid_volume, 10)
+        )
 
     # Alpha#41
     def alpha041(self):
@@ -667,7 +696,7 @@ class TechIndicator:
 
     # Alpha#42
     def alpha042(self):
-        return rank((self.vwap - self.mid_price)) / rank((self.vwap + self.mid_price))
+        return rank(self.vwap - self.mid_price) / rank(self.vwap + self.mid_price)
 
     # Alpha#43
     def alpha043(self):
@@ -705,16 +734,22 @@ class TechIndicator:
         adv20 = sma(self.bid_volume, 20)
         return (
             ((rank((1 / self.mid_price)) * self.bid_volume) / adv20)
-            * ((self.best_bid * rank((self.best_bid - self.mid_price))) / (sma(self.best_bid, 5) / 5))
-        ) - rank((self.vwap - delay(self.vwap, 5)))
+            * (
+                (self.best_bid * rank((self.best_bid - self.mid_price)))
+                / (sma(self.best_bid, 5) / 5)
+            )
+        ) - rank(self.vwap - delay(self.vwap, 5))
 
     # Alpha#48 #self added
     def alpha048(self):
         adv20 = sma(self.bid_volume, 20)
         return (
             ((rank((1 / self.mid_price)) * self.ask_volume) / adv20)
-            * ((self.best_ask * rank((self.best_ask - self.mid_price))) / (sma(self.best_ask, 5) / 5))
-        ) - rank((self.vwap - delay(self.vwap, 5)))
+            * (
+                (self.best_ask * rank((self.best_ask - self.mid_price)))
+                / (sma(self.best_ask, 5) / 5)
+            )
+        ) - rank(self.vwap - delay(self.vwap, 5))
 
     # Alpha#49
     def alpha049(self):
@@ -742,7 +777,7 @@ class TechIndicator:
     def alpha052(self):
         return (
             (-1 * df_delta(ts_min(self.best_bid, 5), 5))
-            * rank(((ts_sum(self.returns, 240) - ts_sum(self.returns, 20)) / 220))
+            * rank((ts_sum(self.returns, 240) - ts_sum(self.returns, 20)) / 220)
         ) * ts_rank(self.bid_volume, 5)
 
     # Alpha#53
@@ -756,7 +791,12 @@ class TechIndicator:
     # Alpha#54
     def alpha054(self):
         inner = self.spread.replace(0, -0.0001)
-        return -1 * (self.best_bid - self.mid_price) * (self.best_ask**5) / (inner * (self.mid_price**5))
+        return (
+            -1
+            * (self.best_bid - self.mid_price)
+            * (self.best_ask**5)
+            / (inner * (self.mid_price**5))
+        )
 
     # Alpha#55
     def alpha055(self):
@@ -768,12 +808,21 @@ class TechIndicator:
     # Alpha#56  #self added
     def alpha056(self):
         inner = self.spread.replace(0, -0.0001)
-        return -1 * (self.best_ask - self.mid_price) * (self.best_bid**5) / (inner * (self.mid_price**5))
+        return (
+            -1
+            * (self.best_ask - self.mid_price)
+            * (self.best_bid**5)
+            / (inner * (self.mid_price**5))
+        )
 
     # Alpha#57
     def alpha057(self):
         return 0 - (
-            1 * ((self.mid_price - self.vwap) / decay_linear(rank(ts_argmax(self.mid_price, 30)).to_frame(), 2).LWMA)
+            1
+            * (
+                (self.mid_price - self.vwap)
+                / decay_linear(rank(ts_argmax(self.mid_price, 30)).to_frame(), 2).LWMA
+            )
         )
 
     # Alpha#58
@@ -783,26 +832,34 @@ class TechIndicator:
     # Alpha#59
     def alpha059(self):
         divisor = self.spread.replace(0, 0.0001)
-        inner = ((self.mid_price - self.best_ask) - (self.best_ask - self.mid_price)) * self.ask_volume / divisor
+        inner = (
+            ((self.mid_price - self.best_ask) - (self.best_ask - self.mid_price))
+            * self.ask_volume
+            / divisor
+        )
         return -((2 * scale(rank(inner))) - scale(rank(ts_argmax(self.mid_price, 10))))
 
     # Alpha#60
     def alpha060(self):
         divisor = self.spread.replace(0, 0.0001)
-        inner = ((self.mid_price - self.best_bid) - (self.best_bid - self.mid_price)) * self.bid_volume / divisor
+        inner = (
+            ((self.mid_price - self.best_bid) - (self.best_bid - self.mid_price))
+            * self.bid_volume
+            / divisor
+        )
         return -((2 * scale(rank(inner))) - scale(rank(ts_argmax(self.mid_price, 10))))
 
     # Alpha#61
     def alpha061(self):
         adv180 = sma(self.ask_volume, 180)
-        return rank((self.vwap - ts_min(self.vwap, 16))) < rank(correlation(self.vwap, adv180, 18))
+        return rank(self.vwap - ts_min(self.vwap, 16)) < rank(correlation(self.vwap, adv180, 18))
 
     # Alpha#62
     def alpha062(self):
         adv20 = sma(self.ask_volume, 20)
         value1 = rank(correlation(self.vwap, sma(adv20, 22), 10))
         value2 = rank(self.best_ask) + rank(self.best_ask)
-        value3 = rank(((self.best_ask + self.best_bid) / 2)) + rank(self.best_ask)
+        value3 = rank((self.best_ask + self.best_bid) / 2) + rank(self.best_ask)
         return value1 - rank(value2 - value3)
 
     def alpha063(self):
@@ -834,7 +891,10 @@ class TechIndicator:
             )
             < rank(
                 df_delta(
-                    ((((self.best_ask + self.best_bid) / 2) * 0.178404) + (self.vwap * (1 - 0.178404))),
+                    (
+                        (((self.best_ask + self.best_bid) / 2) * 0.178404)
+                        + (self.vwap * (1 - 0.178404))
+                    ),
                     3,
                 )
             )
@@ -851,7 +911,7 @@ class TechIndicator:
                     6,
                 )
             )
-            < rank((self.best_ask - ts_min(self.best_ask, 14)))
+            < rank(self.best_ask - ts_min(self.best_ask, 14))
         ) * -1
 
     def alpha066(self):
@@ -889,7 +949,7 @@ class TechIndicator:
     # Alpha#69
     def alpha069(self):
         adv180 = sma(self.bid_volume, 180)
-        return rank((self.vwap - ts_min(self.vwap, 16))) < rank(correlation(self.vwap, adv180, 18))
+        return rank(self.vwap - ts_min(self.vwap, 16)) < rank(correlation(self.vwap, adv180, 18))
 
     # Alpha#70
     def alpha070(self):
@@ -902,7 +962,7 @@ class TechIndicator:
                     6,
                 )
             )
-            < rank((self.best_bid - ts_min(self.best_bid, 14)))
+            < rank(self.best_bid - ts_min(self.best_bid, 14))
         ) * -1
 
     # Alpha#71
@@ -917,7 +977,9 @@ class TechIndicator:
         )
         p2 = ts_rank(
             decay_linear(
-                (rank(((self.best_bid + self.best_ask) - (self.vwap + self.vwap))).pow(2)).to_frame(),
+                (
+                    rank(((self.best_bid + self.best_ask) - (self.vwap + self.vwap))).pow(2)
+                ).to_frame(),
                 16,
             ).LWMA,
             4,
@@ -968,7 +1030,7 @@ class TechIndicator:
             rank(correlation(self.mid_price, sma(adv30, 37), 15))
             < rank(
                 correlation(
-                    rank(((self.best_bid * 0.0261661) + (self.vwap * (1 - 0.0261661)))),
+                    rank((self.best_bid * 0.0261661) + (self.vwap * (1 - 0.0261661))),
                     rank(self.bid_volume),
                     11,
                 )
@@ -1033,7 +1095,7 @@ class TechIndicator:
             rank(
                 log(
                     product(
-                        rank((rank(correlation(self.vwap, ts_sum(adv10, 50), 8)).pow(4))),
+                        rank(rank(correlation(self.vwap, ts_sum(adv10, 50), 8)).pow(4)),
                         15,
                     )
                 )
@@ -1048,7 +1110,7 @@ class TechIndicator:
             rank(
                 log(
                     product(
-                        rank((rank(correlation(self.vwap, ts_sum(adv10, 50), 8)).pow(4))),
+                        rank(rank(correlation(self.vwap, ts_sum(adv10, 50), 8)).pow(4)),
                         15,
                     )
                 )
@@ -1061,14 +1123,15 @@ class TechIndicator:
         adv20 = sma(self.bid_volume, 20)
         return (
             ts_rank(correlation(self.mid_price, sma(adv20, 15), 6), 20)
-            < rank(((self.best_bid + self.mid_price) - (self.vwap + self.best_bid)))
+            < rank((self.best_bid + self.mid_price) - (self.vwap + self.best_bid))
         ) * -1
 
     # Alpha#83
     def alpha083(self):
-        return (rank(delay((self.spread / (ts_sum(self.mid_price, 5) / 5)), 2)) * rank(rank(self.bid_volume))) / (
-            (self.spread / (ts_sum(self.mid_price, 5) / 5)) / (self.vwap - self.mid_price)
-        )
+        return (
+            rank(delay((self.spread / (ts_sum(self.mid_price, 5) / 5)), 2))
+            * rank(rank(self.bid_volume))
+        ) / ((self.spread / (ts_sum(self.mid_price, 5) / 5)) / (self.vwap - self.mid_price))
 
     # Alpha#84
     def alpha084(self):
@@ -1093,7 +1156,7 @@ class TechIndicator:
         adv20 = sma(self.ask_volume, 20)
         return (
             ts_rank(correlation(self.mid_price, sma(adv20, 15), 6), 20)
-            < rank(((self.best_ask + self.mid_price) - (self.vwap + self.best_ask)))
+            < rank((self.best_ask + self.mid_price) - (self.vwap + self.best_ask))
         ) * -1
 
     # Alpha#87
@@ -1137,10 +1200,8 @@ class TechIndicator:
     def alpha090(self):
         return -1 * (
             rank(
-                (
-                    (ts_sum(self.best_ask, 5) * ts_sum(self.returns, 5))
-                    - delay((ts_sum(self.best_ask, 5) * ts_sum(self.returns, 5)), 10)
-                )
+                (ts_sum(self.best_ask, 5) * ts_sum(self.returns, 5))
+                - delay((ts_sum(self.best_ask, 5) * ts_sum(self.returns, 5)), 10)
             )
         )
 
@@ -1173,7 +1234,7 @@ class TechIndicator:
     def alpha093(self):
         adv60 = sma(self.bid_volume, 60)
         return (
-            rank((self.vwap - ts_min(self.vwap, 12))).pow(
+            rank(self.vwap - ts_min(self.vwap, 12)).pow(
                 ts_rank(correlation(ts_rank(self.vwap, 20), ts_rank(adv60, 4), 18), 3)
             )
             * -1
@@ -1183,7 +1244,7 @@ class TechIndicator:
     def alpha094(self):
         adv60 = sma(self.ask_volume, 60)
         return (
-            rank((self.vwap - ts_min(self.vwap, 12))).pow(
+            rank(self.vwap - ts_min(self.vwap, 12)).pow(
                 ts_rank(correlation(ts_rank(self.vwap, 20), ts_rank(adv60, 4), 18), 3)
             )
             * -1
@@ -1192,7 +1253,7 @@ class TechIndicator:
     # Alpha#95
     def alpha095(self):
         adv40 = sma(self.bid_volume, 40)
-        return rank((self.best_bid - ts_min(self.best_bid, 12))) < ts_rank(
+        return rank(self.best_bid - ts_min(self.best_bid, 12)) < ts_rank(
             (rank(correlation(sma(self.mid_price, 19), sma(adv40, 19), 13)).pow(5)), 12
         )
 
@@ -1205,7 +1266,9 @@ class TechIndicator:
         )
         p2 = ts_rank(
             decay_linear(
-                ts_argmax(correlation(ts_rank(self.mid_price, 7), ts_rank(adv60, 4), 4), 13).to_frame(),
+                ts_argmax(
+                    correlation(ts_rank(self.mid_price, 7), ts_rank(adv60, 4), 4), 13
+                ).to_frame(),
                 14,
             ).LWMA,
             13,
@@ -1219,9 +1282,13 @@ class TechIndicator:
     def alpha097(self):
         adv5 = sma(self.ask_volume, 5)
         adv15 = sma(self.ask_volume, 15)
-        return rank(decay_linear(correlation(self.vwap, sma(adv5, 26), 5).to_frame(), 7).LWMA) - rank(
+        return rank(
+            decay_linear(correlation(self.vwap, sma(adv5, 26), 5).to_frame(), 7).LWMA
+        ) - rank(
             decay_linear(
-                ts_rank(ts_argmin(correlation(rank(self.best_ask), rank(adv15), 21), 9), 7).to_frame(),
+                ts_rank(
+                    ts_argmin(correlation(rank(self.best_ask), rank(adv15), 21), 9), 7
+                ).to_frame(),
                 8,
             ).LWMA
         )
@@ -1230,9 +1297,13 @@ class TechIndicator:
     def alpha098(self):
         adv5 = sma(self.bid_volume, 5)
         adv15 = sma(self.bid_volume, 15)
-        return rank(decay_linear(correlation(self.vwap, sma(adv5, 26), 5).to_frame(), 7).LWMA) - rank(
+        return rank(
+            decay_linear(correlation(self.vwap, sma(adv5, 26), 5).to_frame(), 7).LWMA
+        ) - rank(
             decay_linear(
-                ts_rank(ts_argmin(correlation(rank(self.best_bid), rank(adv15), 21), 9), 7).to_frame(),
+                ts_rank(
+                    ts_argmin(correlation(rank(self.best_bid), rank(adv15), 21), 9), 7
+                ).to_frame(),
                 8,
             ).LWMA
         )
@@ -1315,11 +1386,15 @@ def seq_to_label(ary, win_sizes=(10, 20, 40, 80, 160), if_print=False):
         px_diff = px_avg_i[offset:] - px_avg_0[:-offset]
 
         # less_than
-        lt_ary = np.quantile(px_diff, q=(0.01, 0.02, 0.04, 0.07, 0.10, 0.15, 0.20, 0.30, 0.40), axis=0)
+        lt_ary = np.quantile(
+            px_diff, q=(0.01, 0.02, 0.04, 0.07, 0.10, 0.15, 0.20, 0.30, 0.40), axis=0
+        )
         lt_ary = np.less(px_diff[:, None], lt_ary[None, :]).astype(np.float32).mean(axis=1)
 
         # greater_than
-        gt_ary = np.quantile(px_diff, q=(0.60, 0.70, 0.80, 0.85, 0.90, 0.93, 0.96, 0.98, 0.99), axis=0)
+        gt_ary = np.quantile(
+            px_diff, q=(0.60, 0.70, 0.80, 0.85, 0.90, 0.93, 0.96, 0.98, 0.99), axis=0
+        )
         gt_ary = np.greater(px_diff[:, None], gt_ary[None, :]).astype(np.float32).mean(axis=1)
 
         # merge
@@ -1350,7 +1425,9 @@ def convert_btc_csv_to_btc_npy(args=ConfigData()):
 
     if not os.path.exists(label_ary_path):
         price_ary = df["midpoint"].values
-        label_ary = seq_to_label(ary=price_ary, win_sizes=(10, 20, 30, 60, 80, 100, 200, 400), if_print=False)
+        label_ary = seq_to_label(
+            ary=price_ary, win_sizes=(10, 20, 30, 60, 80, 100, 200, 400), if_print=False
+        )
         np.save(label_ary_path, label_ary)
         print(f"| save in {label_ary_path}")
 

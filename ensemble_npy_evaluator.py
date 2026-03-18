@@ -56,19 +56,17 @@ def evaluate_directory(directory_path: str = "exps") -> dict[str, dict]:
         data = np.load(file_path)
 
         if "net_assets" in filename:
-            returns = np.array(
-                [
-                    (data[t + 1] - data[t]) / data[t]
-                    for t in range(len(data) - 1)
-                ]
-            )
+            returns = np.array([(data[t + 1] - data[t]) / data[t] for t in range(len(data) - 1)])
             sr = sharpe_ratio(returns)
             mdd = max_drawdown(returns)
             roma = return_over_max_drawdown(returns)
 
             log.info(
                 "%s  sharpe=%.4f  roma=%.4f  max_drawdown=%.4f",
-                filename, sr, roma, mdd,
+                filename,
+                sr,
+                roma,
+                mdd,
             )
             results[filename] = {"sharpe": sr, "roma": roma, "max_drawdown": mdd}
 
@@ -79,7 +77,9 @@ def evaluate_directory(directory_path: str = "exps") -> dict[str, dict]:
 
             log.info(
                 "%s  win_rate=%.4f  loss_rate=%.4f",
-                filename, win_rate, loss_rate,
+                filename,
+                win_rate,
+                loss_rate,
             )
             results[filename] = {"win_rate": win_rate, "loss_rate": loss_rate}
 

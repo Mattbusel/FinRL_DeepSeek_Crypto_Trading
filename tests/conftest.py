@@ -9,16 +9,15 @@ Provides:
 
 from __future__ import annotations
 
-from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_completion(content: str) -> MagicMock:
     """Build a minimal mock object that looks like an OpenAI ChatCompletion."""
@@ -32,6 +31,7 @@ def _make_completion(content: str) -> MagicMock:
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture()
 def sample_article() -> dict[str, str]:

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import os
-import tempfile
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
@@ -31,6 +29,7 @@ class TestGetClient:
     def test_get_client_raises_without_key(self):
         """_get_client propagates SignalError when key is absent."""
         import deepseek_signals as ds_mod
+
         original = ds_mod._client
         ds_mod._client = None
         try:
@@ -43,6 +42,7 @@ class TestGetClient:
     def test_get_client_reuses_existing(self):
         """_get_client returns the cached client on subsequent calls."""
         import deepseek_signals as ds_mod
+
         original = ds_mod._client
         mock_client = MagicMock()
         ds_mod._client = mock_client
@@ -55,10 +55,12 @@ class TestGetClient:
 
 class TestProcessNewsAnalysis:
     def _make_csv(self, tmp_path, rows=3) -> str:
-        df = pd.DataFrame({
-            "title": [f"Title {i}" for i in range(rows)],
-            "article_text": [f"Article body {i}" for i in range(rows)],
-        })
+        df = pd.DataFrame(
+            {
+                "title": [f"Title {i}" for i in range(rows)],
+                "article_text": [f"Article body {i}" for i in range(rows)],
+            }
+        )
         path = str(tmp_path / "input.csv")
         df.to_csv(path, index=False)
         return path
@@ -71,9 +73,7 @@ class TestProcessNewsAnalysis:
                 str(tmp_path / "out.csv"),
             )
 
-    def test_raises_data_fetch_error_on_unwritable_output(
-        self, tmp_path, mock_deepseek_client
-    ):
+    def test_raises_data_fetch_error_on_unwritable_output(self, tmp_path, mock_deepseek_client):
         """process_news_analysis raises DataFetchError if output path is invalid."""
         input_file = self._make_csv(tmp_path)
         with pytest.raises((DataFetchError, OSError)):
@@ -89,16 +89,18 @@ class TestProcessNewsAnalysis:
 
         # Create a checkpoint that already has the first row done
         checkpoint_file = str(tmp_path / "out_checkpoint.csv")
-        checkpoint_df = pd.DataFrame({
-            "title": ["Title 0"],
-            "article_text": ["Article body 0"],
-            "sentiment_score": [4],
-            "confidence_score_sentiment": [0.9],
-            "reasoning_sentiment": ["ok"],
-            "risk_score": [3],
-            "confidence_score_risk": [0.8],
-            "reasoning_risk": ["ok"],
-        })
+        checkpoint_df = pd.DataFrame(
+            {
+                "title": ["Title 0"],
+                "article_text": ["Article body 0"],
+                "sentiment_score": [4],
+                "confidence_score_sentiment": [0.9],
+                "reasoning_sentiment": ["ok"],
+                "risk_score": [3],
+                "confidence_score_risk": [0.8],
+                "reasoning_risk": ["ok"],
+            }
+        )
         checkpoint_df.to_csv(checkpoint_file, index=False)
 
         # Should not raise; mock client handles the one remaining row
@@ -118,9 +120,7 @@ class TestCallApi:
 
     def test_raises_signal_error_on_invalid_json(self, mock_deepseek_client):
         """_call_api raises SignalError when the response is not JSON."""
-        mock_deepseek_client.side_effect = [
-            self._make_mock_completion("not-valid-json")
-        ]
+        mock_deepseek_client.side_effect = [self._make_mock_completion("not-valid-json")]
         with pytest.raises(SignalError):
             ds._call_api("any prompt")
 
@@ -132,7 +132,9 @@ class TestCallApi:
 
     def test_returns_parsed_dict_on_success(self, mock_deepseek_client):
         """_call_api returns the parsed dict on a valid JSON response."""
-        payload = '{"sentiment_score": 4, "confidence_score_sentiment": 0.9, "reasoning_sentiment": "ok"}'
+        payload = (
+            '{"sentiment_score": 4, "confidence_score_sentiment": 0.9, "reasoning_sentiment": "ok"}'
+        )
         mock_deepseek_client.side_effect = [self._make_mock_completion(payload)]
         result = ds._call_api("any prompt")
         assert result["sentiment_score"] == 4
@@ -149,7 +151,9 @@ class TestCallWithRetry:
 
     def test_succeeds_on_second_attempt(self, mock_deepseek_client):
         """Retries after first failure and returns the successful result."""
-        good = '{"sentiment_score": 3, "confidence_score_sentiment": 0.7, "reasoning_sentiment": "ok"}'
+        good = (
+            '{"sentiment_score": 3, "confidence_score_sentiment": 0.7, "reasoning_sentiment": "ok"}'
+        )
 
         call_count = 0
 

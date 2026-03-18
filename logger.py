@@ -30,19 +30,34 @@ class _JsonFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:  # noqa: D102
         payload: dict[str, Any] = {
-            "timestamp": datetime.fromtimestamp(
-                record.created, tz=timezone.utc
-            ).isoformat(),
+            "timestamp": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
         }
         # Attach any structured fields passed via extra={}
         skip = {
-            "name", "msg", "args", "created", "filename", "funcName",
-            "levelname", "levelno", "lineno", "module", "msecs", "message",
-            "pathname", "process", "processName", "relativeCreated",
-            "stack_info", "thread", "threadName", "exc_info", "exc_text",
+            "name",
+            "msg",
+            "args",
+            "created",
+            "filename",
+            "funcName",
+            "levelname",
+            "levelno",
+            "lineno",
+            "module",
+            "msecs",
+            "message",
+            "pathname",
+            "process",
+            "processName",
+            "relativeCreated",
+            "stack_info",
+            "thread",
+            "threadName",
+            "exc_info",
+            "exc_text",
         }
         for key, value in record.__dict__.items():
             if key not in skip:
@@ -125,6 +140,7 @@ def get_logger(name: str) -> _StructuredLogger:
     # Import here to avoid circular imports during package initialisation.
     try:
         from config import settings
+
         level_name = settings.log_level
     except (ImportError, AttributeError, ValueError):
         level_name = "INFO"

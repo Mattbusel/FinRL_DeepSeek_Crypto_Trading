@@ -13,8 +13,6 @@ Example::
 
 from __future__ import annotations
 
-from typing import Optional, Tuple
-
 import torch as th
 import torch.nn as nn
 
@@ -58,7 +56,7 @@ class NnSeqBnMLP(nn.Module):
         dims: list[int],
         if_inp_norm: bool = False,
         if_layer_norm: bool = True,
-        activation: Optional[nn.Module] = None,
+        activation: nn.Module | None = None,
     ) -> None:
         super().__init__()
 
@@ -161,8 +159,8 @@ class RnnRegNet(nn.Module):
     def forward(
         self,
         inp: TEN,
-        hid: Optional[Tuple[Optional[TEN], Optional[TEN]]] = None,
-    ) -> Tuple[TEN, Tuple[Optional[TEN], Optional[TEN]]]:
+        hid: tuple[TEN | None, TEN | None] | None = None,
+    ) -> tuple[TEN, tuple[TEN | None, TEN | None]]:
         """Run a forward pass over the input sequence.
 
         Args:

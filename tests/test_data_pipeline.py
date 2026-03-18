@@ -29,10 +29,12 @@ class TestCleanAndValidateData:
         assert len(clean_and_validate_data(df)) == 2
 
     def test_removes_duplicates(self):
-        df = pd.DataFrame({
-            "title": ["Same", "Same", "Unique"],
-            "article_text": ["Body", "Body", "Other body"],
-        })
+        df = pd.DataFrame(
+            {
+                "title": ["Same", "Same", "Unique"],
+                "article_text": ["Body", "Body", "Other body"],
+            }
+        )
         assert len(clean_and_validate_data(df)) == 2
 
     def test_removes_empty_string_title(self):

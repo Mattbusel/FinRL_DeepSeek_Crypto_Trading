@@ -19,7 +19,8 @@ from __future__ import annotations
 import inspect
 import os
 import shutil
-from typing import Any, Callable, Dict, List, Optional, Type
+from collections.abc import Callable
+from typing import Any
 
 import numpy as np
 import torch
@@ -46,11 +47,11 @@ class Config:
 
     def __init__(
         self,
-        agent_class: Optional[Type] = None,
-        env_class: Optional[Type] = None,
-        env_args: Optional[Dict[str, Any]] = None,
+        agent_class: type | None = None,
+        env_class: type | None = None,
+        env_args: dict[str, Any] | None = None,
     ) -> None:
-        self.num_envs: Optional[int] = None
+        self.num_envs: int | None = None
         self.agent_class = agent_class
         self.if_off_policy: bool = self.get_if_off_policy()
 
@@ -68,16 +69,16 @@ class Config:
         env_args.setdefault("num_envs", 1)
         env_args.setdefault("max_step", 12345)
 
-        self.env_name: Optional[str] = env_args["env_name"]
+        self.env_name: str | None = env_args["env_name"]
         self.num_envs = env_args["num_envs"]
         self.max_step: int = env_args["max_step"]
-        self.state_dim: Optional[int] = env_args["state_dim"]
-        self.action_dim: Optional[int] = env_args["action_dim"]
-        self.if_discrete: Optional[bool] = env_args["if_discrete"]
+        self.state_dim: int | None = env_args["state_dim"]
+        self.action_dim: int | None = env_args["action_dim"]
+        self.if_discrete: bool | None = env_args["if_discrete"]
 
         # Reward shaping
         self.gamma: float = 0.99
-        self.reward_scale: float = 2 ** 0
+        self.reward_scale: float = 2**0
 
         # Training
         self.net_dims: tuple = (64, 32)
@@ -106,8 +107,8 @@ class Config:
         self.learner_gpus: int = 0
 
         # Evaluation
-        self.cwd: Optional[str] = None
-        self.if_remove: Optional[bool] = True
+        self.cwd: str | None = None
+        self.if_remove: bool | None = True
         self.break_step: float = np.inf
         self.break_score: float = np.inf
         self.if_keep_save: bool = True
@@ -117,8 +118,8 @@ class Config:
         self.save_gap: int = 8
         self.eval_times: int = 3
         self.eval_per_step: int = int(2e4)
-        self.eval_env_class: Optional[Type] = None
-        self.eval_env_args: Optional[Dict[str, Any]] = None
+        self.eval_env_class: type | None = None
+        self.eval_env_args: dict[str, Any] | None = None
 
     def init_before_training(self) -> None:
         """Seed RNGs, configure PyTorch, and prepare the checkpoint directory.
@@ -127,20 +128,16 @@ class Config:
         thread and dtype settings, auto-generates :attr:`cwd` if not set, and
         optionally removes previous run artefacts.
         """
-        np.random.seed(self.random_seed % (2 ** 32))
-        torch.manual_seed(self.random_seed % (2 ** 32))
+        np.random.seed(self.random_seed % (2**32))
+        torch.manual_seed(self.random_seed % (2**32))
         torch.set_num_threads(self.num_threads)
         torch.set_default_dtype(torch.float32)
 
         if self.cwd is None:
-            self.cwd = (
-                f"./{self.env_name}_{self.agent_class.__name__[5:]}_{self.random_seed}"
-            )
+            self.cwd = f"./{self.env_name}_{self.agent_class.__name__[5:]}_{self.random_seed}"
 
         if self.if_remove is None:
-            self.if_remove = bool(
-                input(f"| Arguments PRESS 'y' to REMOVE: {self.cwd}? ") == "y"
-            )
+            self.if_remove = bool(input(f"| Arguments PRESS 'y' to REMOVE: {self.cwd}? ") == "y")
         if self.if_remove:
             shutil.rmtree(self.cwd, ignore_errors=True)
             logger.info("| Arguments Remove cwd: %s", self.cwd)
@@ -170,8 +167,8 @@ class Config:
 
 
 def build_env(
-    env_class: Optional[Type] = None,
-    env_args: Optional[Dict[str, Any]] = None,
+    env_class: type | None = None,
+    env_args: dict[str, Any] | None = None,
     gpu_id: int = -1,
 ) -> Any:
     """Instantiate an RL environment, injecting only supported constructor args.
@@ -204,8 +201,8 @@ def build_env(
 
 def kwargs_filter(
     function: Callable,
-    kwargs: Dict[str, Any],
-) -> Dict[str, Any]:
+    kwargs: dict[str, Any],
+) -> dict[str, Any]:
     """Return only the keyword arguments accepted by *function*.
 
     Inspects the function signature and returns a filtered copy of *kwargs*
@@ -223,7 +220,7 @@ def kwargs_filter(
     return {key: kwargs[key] for key in common_args}
 
 
-def get_gym_env_args(env: Any, if_print: bool) -> Dict[str, Any]:
+def get_gym_env_args(env: Any, if_print: bool) -> dict[str, Any]:
     """Extract standard environment metadata from a gym-compatible env.
 
     Supports both standard OpenAI Gym envs (``0.18.0 <= version <= 0.25.2``)
@@ -260,7 +257,7 @@ def get_gym_env_args(env: Any, if_print: bool) -> Dict[str, Any]:
 
         if_discrete: bool = isinstance(env.action_space, gym.spaces.Discrete)
         if if_discrete:
-            action_dim: int = getattr(env.action_space, "n")
+            action_dim: int = env.action_space.n
         elif isinstance(env.action_space, gym.spaces.Box):
             action_dim = env.action_space.shape[0]
             if any(env.action_space.high - 1):
@@ -281,7 +278,7 @@ def get_gym_env_args(env: Any, if_print: bool) -> Dict[str, Any]:
         action_dim = env.action_dim
         if_discrete = env.if_discrete
 
-    env_args: Dict[str, Any] = {
+    env_args: dict[str, Any] = {
         "env_name": env_name,
         "num_envs": num_envs,
         "max_step": max_step,

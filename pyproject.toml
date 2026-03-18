@@ -73,6 +73,13 @@ ignore = [
     "E501",   # line too long — handled by formatter
     "B008",   # do not perform function calls in default arguments
     "UP007",  # use X | Y for union types — keep compat with Python 3.9
+    "B905",   # zip() without strict= — existing code patterns
+    "B007",   # loop control variable not used in loop body
+    "C419",   # unnecessary list comprehension in all()
+    "W291",   # trailing whitespace — handled by formatter
+    "E402",   # module level import not at top — needed for conditional imports
+    "SIM117", # nested with statements — readability preference in tests
+    "SIM105", # contextlib.suppress — explicit try/except preferred in tests
 ]
 
 [tool.ruff.lint.per-file-ignores]

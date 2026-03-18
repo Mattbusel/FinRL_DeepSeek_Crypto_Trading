@@ -11,9 +11,9 @@ Example::
 
 from __future__ import annotations
 
+import empyrical as ep
 import numpy as np
 import pandas as pd
-import empyrical as ep
 
 from exceptions import SignalError
 
@@ -37,9 +37,7 @@ def cumulative_returns(returns_pct: np.ndarray | list[float]) -> pd.Series:
     return ep.cum_returns(arr)
 
 
-def sharpe_ratio(
-    returns_pct: np.ndarray | list[float], risk_free: float = 0.0
-) -> float:
+def sharpe_ratio(returns_pct: np.ndarray | list[float], risk_free: float = 0.0) -> float:
     """Compute the annualisation-free Sharpe ratio.
 
     Uses the sample standard deviation (``ddof=1``).  Returns ``inf`` when the

@@ -332,9 +332,7 @@ def clean_and_validate_data(df: pd.DataFrame) -> pd.DataFrame:
 
     df = df.dropna(subset=["title", "article_text"])
     df = df.drop_duplicates(subset=["title", "article_text"])
-    df = df[
-        (df["title"].str.strip() != "") & (df["article_text"].str.strip() != "")
-    ]
+    df = df[(df["title"].str.strip() != "") & (df["article_text"].str.strip() != "")]
     df = df.reset_index(drop=True)
 
     log.info("data.clean.done", original=original_len, remaining=len(df))
@@ -381,9 +379,7 @@ def save_checkpoint(df: pd.DataFrame, checkpoint_file: str) -> None:
         df.to_csv(checkpoint_file, index=False, encoding="utf-8")
         log.info("checkpoint.saved", path=checkpoint_file, rows=len(df))
     except OSError as exc:
-        raise DataFetchError(
-            f"Failed to write checkpoint '{checkpoint_file}'.", cause=exc
-        ) from exc
+        raise DataFetchError(f"Failed to write checkpoint '{checkpoint_file}'.", cause=exc) from exc
 
 
 # ---------------------------------------------------------------------------
@@ -413,9 +409,7 @@ def process_news_analysis(input_file: str, output_file: str) -> None:
     try:
         news_df = pd.read_csv(input_file)
     except Exception as exc:
-        raise DataFetchError(
-            f"Cannot read input file '{input_file}'.", cause=exc
-        ) from exc
+        raise DataFetchError(f"Cannot read input file '{input_file}'.", cause=exc) from exc
 
     news_df = clean_and_validate_data(news_df)
 

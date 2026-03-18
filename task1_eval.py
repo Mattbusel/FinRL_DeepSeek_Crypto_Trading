@@ -11,21 +11,19 @@ Usage::
 
 from __future__ import annotations
 
+import os
 import sys
-from typing import List, Type
+from collections import Counter
 
+import numpy as np
 import torch
 
 from erl_agent import AgentD3QN, AgentDoubleDQN, AgentTwinD3QN
 from erl_config import Config, build_env
+from exceptions import DataFetchError, ModelError
 from logger import get_logger
-from metrics import sharpe_ratio, max_drawdown, return_over_max_drawdown
+from metrics import max_drawdown, return_over_max_drawdown, sharpe_ratio
 from trade_simulator import EvalTradeSimulator
-from exceptions import ModelError, DataFetchError
-
-import os
-import numpy as np
-from collections import Counter
 
 log = get_logger(__name__)
 
@@ -62,7 +60,7 @@ class EnsembleEvaluator:
     def __init__(
         self,
         save_path: str,
-        agent_classes: List[Type],
+        agent_classes: list[type],
         args: Config,
     ) -> None:
         self.save_path = save_path
@@ -84,9 +82,7 @@ class EnsembleEvaluator:
         try:
             self.trade_env = build_env(args.env_class, args.env_args, gpu_id=args.gpu_id)
         except Exception as exc:
-            raise DataFetchError(
-                "Failed to build evaluation environment.", cause=exc
-            ) from exc
+            raise DataFetchError("Failed to build evaluation environment.", cause=exc) from exc
 
         self.current_btc: int = 0
         self.cash: list[float] = [args.starting_cash]
@@ -152,9 +148,7 @@ class EnsembleEvaluator:
             DataFetchError: If result arrays cannot be saved to disk.
         """
         if not self.agents:
-            raise ModelError(
-                "No agents loaded. Call load_agents() before multi_trade()."
-            )
+            raise ModelError("No agents loaded. Call load_agents() before multi_trade().")
 
         agents = self.agents
         trade_env = self.trade_env
@@ -172,9 +166,7 @@ class EnsembleEvaluator:
         for step in range(trade_env.max_step):
             actions: list[torch.Tensor] = []
             for agent in agents:
-                tensor_state = torch.as_tensor(
-                    last_state, dtype=torch.float32, device=agent.device
-                )
+                tensor_state = torch.as_tensor(last_state, dtype=torch.float32, device=agent.device)
                 q_values = agent.act(tensor_state)
                 tensor_action = q_values.argmax(dim=1)
                 actions.append(tensor_action.detach().cpu().unsqueeze(1))
@@ -203,9 +195,21 @@ class EnsembleEvaluator:
             last_state = state
 
             if action_int == 1:
-                correct_pred.append(1 if last_price < float(mid_price) else -1 if last_price > float(mid_price) else 0)
+                correct_pred.append(
+                    1
+                    if last_price < float(mid_price)
+                    else -1
+                    if last_price > float(mid_price)
+                    else 0
+                )
             elif action_int == -1:
-                correct_pred.append(-1 if last_price < float(mid_price) else 1 if last_price > float(mid_price) else 0)
+                correct_pred.append(
+                    -1
+                    if last_price < float(mid_price)
+                    else 1
+                    if last_price > float(mid_price)
+                    else 0
+                )
             else:
                 correct_pred.append(0)
 
@@ -240,7 +244,7 @@ class EnsembleEvaluator:
         )
 
 
-def run_evaluation(save_path: str, agent_list: List[Type]) -> None:
+def run_evaluation(save_path: str, agent_list: list[type]) -> None:
     """Configure and run the full evaluation pipeline.
 
     Args:
@@ -272,9 +276,7 @@ def run_evaluation(save_path: str, agent_list: List[Type]) -> None:
         "slippage": slippage,
         "num_sims": num_sims,
         "step_gap": step_gap,
-        "dataset_path": os.path.join(
-            os.path.dirname(__file__), "data", "btc_1sec_input.npy"
-        ),
+        "dataset_path": os.path.join(os.path.dirname(__file__), "data", "btc_1sec_input.npy"),
     }
     args = Config(agent_class=None, env_class=EvalTradeSimulator, env_args=env_args)
     args.gpu_id = gpu_id

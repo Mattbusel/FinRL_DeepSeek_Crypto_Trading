@@ -1,7 +1,7 @@
 import logging
 import os
+
 import torch
-from typing import Tuple
 from torch import Tensor
 
 logger = logging.getLogger(__name__)
@@ -21,12 +21,14 @@ class ReplayBuffer:  # for off-policy
         num_seqs: Number of parallel sequences (``num_workers * num_envs``).
     """
 
-    def __init__(self,
-                 max_size: int,
-                 state_dim: int,
-                 action_dim: int,
-                 gpu_id: int = 0,
-                 num_seqs: int = 1, ):
+    def __init__(
+        self,
+        max_size: int,
+        state_dim: int,
+        action_dim: int,
+        gpu_id: int = 0,
+        num_seqs: int = 1,
+    ):
         self.p = 0  # pointer
         self.if_full = False
         self.cur_size = 0
@@ -34,7 +36,9 @@ class ReplayBuffer:  # for off-policy
         self.add_item = None
         self.max_size = max_size
         self.num_seqs = num_seqs
-        self.device = torch.device(f"cuda:{gpu_id}" if (torch.cuda.is_available() and (gpu_id >= 0)) else "cpu")
+        self.device = torch.device(
+            f"cuda:{gpu_id}" if (torch.cuda.is_available() and (gpu_id >= 0)) else "cpu"
+        )
 
         """The struction of ReplayBuffer (for example, num_seqs = num_workers * num_envs == 2*4 = 8
         ReplayBuffer:
@@ -58,8 +62,12 @@ class ReplayBuffer:  # for off-policy
         sequence of transition: s-a-r-d, s-a-r-d, s-a-r-D  s-a-r-d, s-a-r-d, s-a-r-d, s-a-r-d, s-a-r-D  s-a-r-d, ...
                                 <------trajectory------->  <----------trajectory--------------------->  <-----------
         """
-        self.states = torch.empty((max_size, num_seqs, state_dim), dtype=torch.float32, device=self.device)
-        self.actions = torch.empty((max_size, num_seqs, action_dim), dtype=torch.float32, device=self.device)
+        self.states = torch.empty(
+            (max_size, num_seqs, state_dim), dtype=torch.float32, device=self.device
+        )
+        self.actions = torch.empty(
+            (max_size, num_seqs, action_dim), dtype=torch.float32, device=self.device
+        )
         self.rewards = torch.empty((max_size, num_seqs), dtype=torch.float32, device=self.device)
         self.undones = torch.empty((max_size, num_seqs), dtype=torch.float32, device=self.device)
 
@@ -68,7 +76,7 @@ class ReplayBuffer:  # for off-policy
         self.per_alpha = None
         self.per_beta = None
 
-    def update(self, items: Tuple[Tensor, ...]):
+    def update(self, items: tuple[Tensor, ...]):
         """Write a batch of transitions into the circular buffer.
 
         Args:
@@ -98,15 +106,15 @@ class ReplayBuffer:  # for off-policy
             self.rewards[p0:p1], self.rewards[0:p] = rewards[:p2], rewards[-p:]
             self.undones[p0:p1], self.undones[0:p] = undones[:p2], undones[-p:]
         else:
-            self.states[self.p:p] = states
-            self.actions[self.p:p] = actions
-            self.rewards[self.p:p] = rewards
-            self.undones[self.p:p] = undones
+            self.states[self.p : p] = states
+            self.actions[self.p : p] = actions
+            self.rewards[self.p : p] = rewards
+            self.undones[self.p : p] = undones
 
         self.p = p
         self.cur_size = self.max_size if self.if_full else self.p
 
-    def sample(self, batch_size: int) -> Tuple[Tensor, Tensor, Tensor, Tensor, Tensor]:
+    def sample(self, batch_size: int) -> tuple[Tensor, Tensor, Tensor, Tensor, Tensor]:
         """Draw a random mini-batch of transitions from the buffer.
 
         Args:
@@ -120,13 +128,15 @@ class ReplayBuffer:  # for off-policy
 
         ids = torch.randint(sample_len * self.num_seqs, size=(batch_size,), requires_grad=False)
         ids0 = torch.fmod(ids, sample_len)  # ids % sample_len
-        ids1 = torch.div(ids, sample_len, rounding_mode='floor')  # ids // sample_len
+        ids1 = torch.div(ids, sample_len, rounding_mode="floor")  # ids // sample_len
 
-        return (self.states[ids0, ids1],
-                self.actions[ids0, ids1],
-                self.rewards[ids0, ids1],
-                self.undones[ids0, ids1],
-                self.states[ids0 + 1, ids1],)  # next_state
+        return (
+            self.states[ids0, ids1],
+            self.actions[ids0, ids1],
+            self.rewards[ids0, ids1],
+            self.undones[ids0, ids1],
+            self.states[ids0 + 1, ids1],
+        )  # next_state
 
     def save_or_load_history(self, cwd: str, if_save: bool):
         """Persist or restore the buffer contents to/from disk.
@@ -147,9 +157,9 @@ class ReplayBuffer:  # for off-policy
         if if_save:
             for item, name in item_names:
                 if self.cur_size == self.p:
-                    buf_item = item[:self.cur_size]
+                    buf_item = item[: self.cur_size]
                 else:
-                    buf_item = torch.vstack((item[self.p:self.cur_size], item[0:self.p]))
+                    buf_item = torch.vstack((item[self.p : self.cur_size], item[0 : self.p]))
                 file_path = f"{cwd}/replay_buffer_{name}.pth"
                 logger.info("| buffer.save_or_load_history(): Save %s", file_path)
                 torch.save(buf_item, file_path)

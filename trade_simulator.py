@@ -13,7 +13,6 @@ Both inherit from :class:`TradeSimulator` and expose the standard
 from __future__ import annotations
 
 import sys
-from typing import Dict, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -79,14 +78,10 @@ class TradeSimulator:
         self.factor_ary = np.load(args.predict_ary_path)
         self.factor_ary = th.tensor(self.factor_ary, dtype=th.float32)  # CPU
 
-        logger.info(
-            "TradeSimulator.init -- loading price CSV from %s", args.csv_path
-        )
+        logger.info("TradeSimulator.init -- loading price CSV from %s", args.csv_path)
         data_df = pd.read_csv(args.csv_path)
 
-        self.price_ary = data_df[
-            ["bids_distance_3", "asks_distance_3", "midpoint"]
-        ].values
+        self.price_ary = data_df[["bids_distance_3", "asks_distance_3", "midpoint"]].values
         self.price_ary[:, 0] = self.price_ary[:, 2] * (1 + self.price_ary[:, 0])
         self.price_ary[:, 1] = self.price_ary[:, 2] * (1 + self.price_ary[:, 1])
 
@@ -136,9 +131,7 @@ class TradeSimulator:
             self.max_step,
         )
 
-    def _reset(
-        self, slippage: Optional[float] = None, _if_random: bool = True
-    ) -> th.Tensor:
+    def _reset(self, slippage: float | None = None, _if_random: bool = True) -> th.Tensor:
         """Internal reset implementation shared by both environment variants.
 
         Args:
@@ -168,9 +161,7 @@ class TradeSimulator:
         self.position = th.zeros((num_sims,), dtype=th.long, device=device)
         self.empty_count = th.zeros((num_sims,), dtype=th.long, device=device)
 
-        self.best_price = th.zeros(
-            (self.num_sims,), dtype=th.float32, device=self.device
-        )
+        self.best_price = th.zeros((self.num_sims,), dtype=th.float32, device=self.device)
 
         step_is = self.step_is + self.step_i
         state = self.get_state(step_is_cpu=step_is.to(th.device("cpu")))
@@ -179,7 +170,7 @@ class TradeSimulator:
 
     def _step(
         self, action: th.Tensor, _if_random: bool = True
-    ) -> Tuple[th.Tensor, th.Tensor, th.Tensor, Dict]:
+    ) -> tuple[th.Tensor, th.Tensor, th.Tensor, dict]:
         """Internal step implementation.
 
         Args:
@@ -210,9 +201,7 @@ class TradeSimulator:
         if truncated:
             action_int = -old_position
         else:
-            new_position = (old_position + action_int).clip(
-                -self.max_position, self.max_position
-            )
+            new_position = (old_position + action_int).clip(-self.max_position, self.max_position)
             action_int = new_position - old_position
 
             done_mask = (new_position * old_position).lt(0) & old_position.ne(0)
@@ -230,9 +219,7 @@ class TradeSimulator:
         direction_mask1 = old_position.gt(0)
         if direction_mask1.sum() > 0:
             _best_price = th.max(
-                th.stack(
-                    [self.best_price[direction_mask1], mid_price[direction_mask1]]
-                ),
+                th.stack([self.best_price[direction_mask1], mid_price[direction_mask1]]),
                 dim=0,
             )[0]
             self.best_price[direction_mask1] = _best_price
@@ -240,9 +227,7 @@ class TradeSimulator:
         direction_mask2 = old_position.lt(0)
         if direction_mask2.sum() > 0:
             _best_price = th.min(
-                th.stack(
-                    [self.best_price[direction_mask2], mid_price[direction_mask2]]
-                ),
+                th.stack([self.best_price[direction_mask2], mid_price[direction_mask2]]),
                 dim=0,
             )[0]
             self.best_price[direction_mask2] = _best_price
@@ -268,9 +253,7 @@ class TradeSimulator:
         direction = action_int.gt(0)
         cost = action_int * mid_price
 
-        new_cash = old_cash - cost * th.where(
-            direction, 1 + self.slippage, 1 - self.slippage
-        )
+        new_cash = old_cash - cost * th.where(direction, 1 + self.slippage, 1 - self.slippage)
         new_asset = new_cash + new_position * mid_price
 
         reward = new_asset - old_asset
@@ -281,7 +264,7 @@ class TradeSimulator:
         self.action_int = action_int
 
         state = self.get_state(step_is_cpu)
-        info_dict: Dict = {}
+        info_dict: dict = {}
         if truncated:
             terminal = th.ones_like(self.position, dtype=th.bool)
             state = self.reset()
@@ -290,9 +273,7 @@ class TradeSimulator:
 
         return state, reward, terminal, info_dict
 
-    def reset(
-        self, slippage: Optional[float] = None, date_strs: Tuple = ()
-    ) -> th.Tensor:
+    def reset(self, slippage: float | None = None, date_strs: tuple = ()) -> th.Tensor:
         """Reset all parallel environments to random starting positions.
 
         Args:
@@ -304,9 +285,7 @@ class TradeSimulator:
         """
         return self._reset(slippage=slippage, _if_random=True)
 
-    def step(
-        self, action: th.Tensor
-    ) -> Tuple[th.Tensor, th.Tensor, th.Tensor, Dict]:
+    def step(self, action: th.Tensor) -> tuple[th.Tensor, th.Tensor, th.Tensor, dict]:
         """Advance all parallel environments by one step.
 
         Args:
@@ -348,9 +327,7 @@ class EvalTradeSimulator(TradeSimulator):
     (sequential rather than random offsets).
     """
 
-    def reset(
-        self, slippage: Optional[float] = None, date_strs: Tuple = ()
-    ) -> th.Tensor:
+    def reset(self, slippage: float | None = None, date_strs: tuple = ()) -> th.Tensor:
         """Reset to a deterministic starting position with a tighter stop-loss.
 
         Args:
@@ -363,9 +340,7 @@ class EvalTradeSimulator(TradeSimulator):
         self.stop_loss_thresh = 1e-4
         return self._reset(slippage=slippage, _if_random=False)
 
-    def step(
-        self, action: th.Tensor
-    ) -> Tuple[th.Tensor, th.Tensor, th.Tensor, Dict]:
+    def step(self, action: th.Tensor) -> tuple[th.Tensor, th.Tensor, th.Tensor, dict]:
         """Advance all environments deterministically by one step.
 
         Args:
@@ -384,9 +359,7 @@ def check_simulator() -> None:
     to CPU.
     """
     gpu_id = int(sys.argv[1]) if len(sys.argv) > 1 else -1
-    device = th.device(
-        f"cuda:{gpu_id}" if (th.cuda.is_available() and (gpu_id >= 0)) else "cpu"
-    )
+    device = th.device(f"cuda:{gpu_id}" if (th.cuda.is_available() and (gpu_id >= 0)) else "cpu")
     num_sims = 6
     slippage = 0
     step_gap = 2
@@ -410,9 +383,7 @@ def check_simulator() -> None:
 
     logger.info("check_simulator.run2 starting")
 
-    reward_ary = th.zeros(
-        (num_sims, sim.max_step + delay_step), dtype=th.float32, device=device
-    )
+    reward_ary = th.zeros((num_sims, sim.max_step + delay_step), dtype=th.float32, device=device)
 
     state = sim.reset(slippage=slippage)
     for step_i in range(sim.max_step):

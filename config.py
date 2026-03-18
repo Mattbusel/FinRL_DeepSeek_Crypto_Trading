@@ -13,9 +13,6 @@ Example::
 
 from __future__ import annotations
 
-import os
-from typing import List
-
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 
@@ -63,7 +60,7 @@ class LARSASettings(BaseSettings):
         ge=1,
         description="Maximum number of API call attempts before giving up.",
     )
-    retry_backoff_seconds: List[float] = Field(
+    retry_backoff_seconds: list[float] = Field(
         default=[1.0, 2.0, 4.0, 8.0, 16.0],
         description="Exponential backoff wait times (seconds) between retries.",
     )
@@ -170,7 +167,7 @@ class LARSASettings(BaseSettings):
         ge=0.0,
         description="State-value normalisation tau.",
     )
-    rl_net_dims: List[int] = Field(
+    rl_net_dims: list[int] = Field(
         default=[128, 128, 128],
         description="Hidden-layer widths of the RL policy/value network.",
     )

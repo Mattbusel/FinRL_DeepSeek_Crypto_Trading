@@ -1,7 +1,7 @@
 """Tests for erl_replay_buffer.ReplayBuffer."""
 
-import sys
 import os
+import sys
 
 import pytest
 
@@ -11,13 +11,14 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from erl_replay_buffer import ReplayBuffer
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _make_buffer(max_size: int = 100, state_dim: int = 4, action_dim: int = 1,
-                 num_seqs: int = 1) -> ReplayBuffer:
+
+def _make_buffer(
+    max_size: int = 100, state_dim: int = 4, action_dim: int = 1, num_seqs: int = 1
+) -> ReplayBuffer:
     """Construct a CPU replay buffer for testing."""
     return ReplayBuffer(
         max_size=max_size,
@@ -30,7 +31,7 @@ def _make_buffer(max_size: int = 100, state_dim: int = 4, action_dim: int = 1,
 
 def _make_items(horizon: int, num_seqs: int = 1, state_dim: int = 4, action_dim: int = 1):
     """Return a tuple of random transition tensors."""
-    states  = torch.randn(horizon, num_seqs, state_dim)
+    states = torch.randn(horizon, num_seqs, state_dim)
     actions = torch.randint(0, 3, (horizon, num_seqs, action_dim)).float()
     rewards = torch.randn(horizon, num_seqs)
     undones = torch.ones(horizon, num_seqs)
@@ -40,6 +41,7 @@ def _make_items(horizon: int, num_seqs: int = 1, state_dim: int = 4, action_dim:
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+
 
 def test_push_and_sample():
     """After pushing N items, sampling batch_size should return that many rows."""

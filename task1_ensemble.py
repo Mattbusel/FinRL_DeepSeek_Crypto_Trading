@@ -16,7 +16,6 @@ import os
 import sys
 import time
 from collections import Counter
-from typing import List, Optional, Type
 
 import numpy as np
 import torch
@@ -28,15 +27,12 @@ from erl_evaluator import Evaluator
 from erl_replay_buffer import ReplayBuffer
 from exceptions import DataFetchError, ModelError
 from logger import get_logger
-from metrics import sharpe_ratio, max_drawdown, return_over_max_drawdown
 from trade_simulator import EvalTradeSimulator, TradeSimulator
 
 log = get_logger(__name__)
 
 
-def can_buy(
-    action: int, mid_price: float, cash: float, current_btc: int
-) -> tuple[float, int]:
+def can_buy(action: int, mid_price: float, cash: float, current_btc: int) -> tuple[float, int]:
     """Simulate a single buy or sell transaction.
 
     Args:
@@ -103,7 +99,7 @@ class Ensemble:
         log_rules: bool,
         save_path: str,
         starting_cash: float,
-        agent_classes: List[Type],
+        agent_classes: list[type],
         args: Config,
     ) -> None:
         self.log_rules = log_rules
@@ -115,7 +111,7 @@ class Ensemble:
         self.net_assets: list[float] = [starting_cash]
         self.cash: list[float] = [starting_cash]
         self.agent_classes = agent_classes
-        self.from_env_step_is: Optional[object] = None
+        self.from_env_step_is: object | None = None
 
         self.args = args
         self.agents: list = []
@@ -139,9 +135,7 @@ class Ensemble:
         )
 
         try:
-            self.trade_env = build_env(
-                eval_env_class, eval_env_args, gpu_id=args.gpu_id
-            )
+            self.trade_env = build_env(eval_env_class, eval_env_args, gpu_id=args.gpu_id)
         except Exception as exc:
             raise DataFetchError(
                 "Failed to build trade environment for ensemble.", cause=exc
@@ -226,9 +220,7 @@ class Ensemble:
         try:
             env = build_env(args.env_class, args.env_args, args.gpu_id)
         except Exception as exc:
-            raise DataFetchError(
-                "Failed to build training environment.", cause=exc
-            ) from exc
+            raise DataFetchError("Failed to build training environment.", cause=exc) from exc
 
         agent = args.agent_class(
             args.net_dims,
@@ -243,16 +235,11 @@ class Ensemble:
         if args.num_envs == 1:
             if state.shape != (args.state_dim,):
                 raise ModelError(
-                    f"Unexpected state shape {state.shape!r}; "
-                    f"expected ({args.state_dim},)."
+                    f"Unexpected state shape {state.shape!r}; expected ({args.state_dim},)."
                 )
             if not isinstance(state, np.ndarray):
-                raise ModelError(
-                    f"Expected np.ndarray state; got {type(state).__name__}."
-                )
-            state = torch.tensor(
-                state, dtype=torch.float32, device=agent.device
-            ).unsqueeze(0)
+                raise ModelError(f"Expected np.ndarray state; got {type(state).__name__}.")
+            state = torch.tensor(state, dtype=torch.float32, device=agent.device).unsqueeze(0)
         else:
             if state.shape != (args.num_envs, args.state_dim):
                 raise ModelError(
@@ -260,9 +247,7 @@ class Ensemble:
                     f"(num_envs={args.num_envs}, state_dim={args.state_dim})."
                 )
             if not isinstance(state, torch.Tensor):
-                raise ModelError(
-                    f"Expected torch.Tensor state; got {type(state).__name__}."
-                )
+                raise ModelError(f"Expected torch.Tensor state; got {type(state).__name__}.")
             state = state.to(agent.device)
 
         agent.last_state = state.detach()
@@ -334,9 +319,7 @@ class Ensemble:
                 exp_r=exp_r,
                 logging_tuple=logging_tuple,
             )
-            if_train = (evaluator.total_step <= break_step) and (
-                not os.path.exists(f"{cwd}/stop")
-            )
+            if_train = (evaluator.total_step <= break_step) and (not os.path.exists(f"{cwd}/stop"))
 
         elapsed = time.time() - evaluator.start_time
         log.info("train.complete", elapsed_s=round(elapsed, 1), cwd=cwd)
@@ -354,7 +337,7 @@ class Ensemble:
 
 def run(
     save_path: str,
-    agent_list: List[Type],
+    agent_list: list[type],
     log_rules: bool = False,
 ) -> None:
     """Configure and run the full ensemble training pipeline.

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
@@ -28,10 +28,7 @@ class TestUpdateNetwork:
         _update_network(optimizer, obj, clip_grad_norm=10.0)
 
         params_after = list(net.parameters())
-        changed = any(
-            not th.allclose(pb, pa)
-            for pb, pa in zip(params_before, params_after)
-        )
+        changed = any(not th.allclose(pb, pa) for pb, pa in zip(params_before, params_after))
         assert changed, "Parameters should change after an optimizer step"
 
     def test_gradients_zero_after_step(self):

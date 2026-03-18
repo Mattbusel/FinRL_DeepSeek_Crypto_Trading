@@ -11,18 +11,18 @@ import pytest
 
 torch = pytest.importorskip("torch", reason="torch not installed")
 
-import numpy as np
-import pandas as pd
 from unittest.mock import patch
 
+import numpy as np
+import pandas as pd
 
 # ---------------------------------------------------------------------------
 # Test data configuration
 # ---------------------------------------------------------------------------
 
 NUM_SIMS = 4
-SEQ_LEN = 8000       # must be > 3 * seq_len (3600) to avoid randint edge cases
-FACTOR_DIM = 8       # matches state_dim - 4 (position, holding, 2 LLM signals)
+SEQ_LEN = 8000  # must be > 3 * seq_len (3600) to avoid randint edge cases
+FACTOR_DIM = 8  # matches state_dim - 4 (position, holding, 2 LLM signals)
 STEP_GAP = 2
 NUM_IGNORE = 60
 
@@ -30,6 +30,7 @@ NUM_IGNORE = 60
 # ---------------------------------------------------------------------------
 # Shared mock helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_factor_ary(rows: int = SEQ_LEN, dim: int = FACTOR_DIM) -> np.ndarray:
     """Return a random float32 factor array."""
@@ -41,23 +42,28 @@ def _make_price_df(rows: int = SEQ_LEN) -> pd.DataFrame:
     """Return a minimal price DataFrame."""
     rng = np.random.default_rng(0)
     mid = rng.uniform(20_000, 30_000, rows)
-    return pd.DataFrame({
-        "bids_distance_3": rng.uniform(-0.01, 0, rows),
-        "asks_distance_3": rng.uniform(0, 0.01, rows),
-        "midpoint": mid,
-        "sentiment_score": rng.integers(1, 6, rows).astype(float),
-        "risk_score": rng.integers(1, 6, rows).astype(float),
-    })
+    return pd.DataFrame(
+        {
+            "bids_distance_3": rng.uniform(-0.01, 0, rows),
+            "asks_distance_3": rng.uniform(0, 0.01, rows),
+            "midpoint": mid,
+            "sentiment_score": rng.integers(1, 6, rows).astype(float),
+            "risk_score": rng.integers(1, 6, rows).astype(float),
+        }
+    )
 
 
 def _make_simulator(cls_name: str = "TradeSimulator", **kwargs):
     """Instantiate a simulator class with all disk I/O mocked."""
     import trade_simulator as ts
+
     cls = getattr(ts, cls_name)
     factor_ary = _make_factor_ary()
     price_df = _make_price_df()
-    with patch("numpy.load", return_value=factor_ary), \
-         patch("pandas.read_csv", return_value=price_df):
+    with (
+        patch("numpy.load", return_value=factor_ary),
+        patch("pandas.read_csv", return_value=price_df),
+    ):
         sim = cls(
             num_sims=NUM_SIMS,
             step_gap=STEP_GAP,
@@ -76,6 +82,7 @@ def _action(value: int, num_sims: int = NUM_SIMS) -> torch.Tensor:
 # ---------------------------------------------------------------------------
 # Initialisation
 # ---------------------------------------------------------------------------
+
 
 class TestTradeSimulatorInit:
     def test_state_dim_matches_expected(self):
@@ -115,6 +122,7 @@ class TestTradeSimulatorInit:
 # Reset
 # ---------------------------------------------------------------------------
 
+
 class TestTradeSimulatorReset:
     def test_reset_returns_tensor(self):
         sim = _make_simulator()
@@ -150,6 +158,7 @@ class TestTradeSimulatorReset:
 # ---------------------------------------------------------------------------
 # Step
 # ---------------------------------------------------------------------------
+
 
 class TestTradeSimulatorStep:
     def test_step_returns_four_values(self):
@@ -221,6 +230,7 @@ class TestTradeSimulatorStep:
 # PnL accounting
 # ---------------------------------------------------------------------------
 
+
 class TestTradeSimulatorPnL:
     def test_asset_non_negative_after_hold(self):
         """Holding with no open position results in asset >= 0."""
@@ -250,6 +260,7 @@ class TestTradeSimulatorPnL:
 # ---------------------------------------------------------------------------
 # EvalTradeSimulator
 # ---------------------------------------------------------------------------
+
 
 class TestEvalTradeSimulator:
     def test_state_dim_matches(self):

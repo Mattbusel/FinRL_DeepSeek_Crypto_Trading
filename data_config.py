@@ -27,9 +27,7 @@ class ConfigData:
 
     def __init__(self, data_dir: str = "./data") -> None:
         if not isinstance(data_dir, str):
-            raise TypeError(
-                f"data_dir must be a str, got {type(data_dir).__name__!r}"
-            )
+            raise TypeError(f"data_dir must be a str, got {type(data_dir).__name__!r}")
         self.data_dir: str = data_dir
         self.csv_path: str = f"{data_dir}/BTC_1sec_with_sentiment_risk_train.csv"
 

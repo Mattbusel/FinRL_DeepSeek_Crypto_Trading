@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import os
 import sys
-from typing import Optional, Tuple
 
 import numpy as np
 import torch as th
@@ -51,9 +50,7 @@ class SeqData:
         label_ary_path = args.label_ary_path
 
         if not os.path.exists(label_ary_path) or not os.path.exists(input_ary_path):
-            log.info(
-                "seq_data.generate -- array files missing, running convert_btc_csv_to_btc_npy"
-            )
+            log.info("seq_data.generate -- array files missing, running convert_btc_csv_to_btc_npy")
             convert_btc_csv_to_btc_npy(args=args)
 
         input_seq = np.load(input_ary_path)
@@ -85,7 +82,7 @@ class SeqData:
         batch_size: int = 32,
         seq_len: int = 4096,
         device: th.device = th.device("cpu"),
-    ) -> Tuple[TEN, TEN]:
+    ) -> tuple[TEN, TEN]:
         """Draw a random batch of fixed-length sub-sequences from the training split.
 
         Args:
@@ -136,9 +133,7 @@ def train_model(gpu_id: int) -> None:
     Args:
         gpu_id: CUDA device index.  Pass ``-1`` to force CPU.
     """
-    device = th.device(
-        f"cuda:{gpu_id}" if (th.cuda.is_available() and gpu_id >= 0) else "cpu"
-    )
+    device = th.device(f"cuda:{gpu_id}" if (th.cuda.is_available() and gpu_id >= 0) else "cpu")
 
     batch_size = settings.rnn_batch_size
     mid_dim = settings.rnn_mid_dim
@@ -170,7 +165,7 @@ def train_model(gpu_id: int) -> None:
 
     evaluator = Evaluator(out_dir=out_dir)
 
-    seq_len = 2 ** 8
+    seq_len = 2**8
     train_times = int(seq_data.train_seq_len / seq_len / batch_size * epoch)
     log.info(
         "train_model.start",
@@ -180,9 +175,7 @@ def train_model(gpu_id: int) -> None:
     for step_idx in range(train_times):
         th.set_grad_enabled(True)
         net.train()
-        inp, lab = seq_data.sample_for_train(
-            batch_size=batch_size, seq_len=seq_len, device=device
-        )
+        inp, lab = seq_data.sample_for_train(batch_size=batch_size, seq_len=seq_len, device=device)
         out, _ = net(inp)
         obj = net.get_obj_value(criterion=criterion, out=out, lab=lab, wup_dim=wup_dim)
         _update_network(optimizer, obj.mean(), clip_grad_norm)
@@ -225,7 +218,7 @@ def train_model(gpu_id: int) -> None:
     log.info("train_model.network_saved", extra={"path": predict_net_path})
 
     predict_ary = np.empty_like(seq_data.valid_label_seq)
-    hid: Optional[TEN] = None
+    hid: TEN | None = None
 
     log.info(
         "train_model.inference_start",
@@ -255,9 +248,7 @@ def valid_model(gpu_id: int) -> None:
     Args:
         gpu_id: CUDA device index.  Pass ``-1`` to force CPU.
     """
-    device = th.device(
-        f"cuda:{gpu_id}" if (th.cuda.is_available() and gpu_id >= 0) else "cpu"
-    )
+    device = th.device(f"cuda:{gpu_id}" if (th.cuda.is_available() and gpu_id >= 0) else "cpu")
     th.set_grad_enabled(False)
 
     mid_dim = 128
@@ -276,14 +267,12 @@ def valid_model(gpu_id: int) -> None:
     net = RnnRegNet(
         inp_dim=input_dim, mid_dim=mid_dim, out_dim=label_dim, num_layers=num_layers
     ).to(device)
-    net.load_state_dict(
-        th.load(predict_net_path, map_location=lambda storage, loc: storage)
-    )
+    net.load_state_dict(th.load(predict_net_path, map_location=lambda storage, loc: storage))
 
     predict_ary = np.empty_like(seq_data.valid_label_seq)
-    hid: Optional[TEN] = None
+    hid: TEN | None = None
 
-    seq_len = 2 ** 9
+    seq_len = 2**9
     log.info(
         "valid_model.start",
         extra={

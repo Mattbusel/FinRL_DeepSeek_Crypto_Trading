@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 import sys
 import tempfile
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
@@ -52,9 +52,7 @@ def _make_mock_actor(action_dim: int = 3, state_dim: int = 8) -> MagicMock:
     import torch
 
     actor = MagicMock()
-    actor.parameters = MagicMock(
-        return_value=iter([torch.zeros(1)])
-    )
+    actor.parameters = MagicMock(return_value=iter([torch.zeros(1)]))
     actor.side_effect = lambda s: torch.randn(s.shape[0], action_dim)
     return actor
 
@@ -124,9 +122,9 @@ class TestEvaluatorInit:
     def test_evaluator_sets_cwd(self) -> None:
         """Evaluator stores the cwd attribute correctly."""
         pytest.importorskip("torch")
-        from erl_evaluator import Evaluator
-        from erl_config import Config
         from erl_agent import AgentD3QN
+        from erl_config import Config
+        from erl_evaluator import Evaluator
 
         env = _make_mock_env()
         env_args = {
@@ -146,9 +144,9 @@ class TestEvaluatorInit:
     def test_evaluator_sets_max_r(self) -> None:
         """Evaluator max_r starts at -inf."""
         pytest.importorskip("torch")
-        from erl_evaluator import Evaluator
-        from erl_config import Config
         from erl_agent import AgentD3QN
+        from erl_config import Config
+        from erl_evaluator import Evaluator
 
         env = _make_mock_env()
         env_args = {
@@ -168,9 +166,9 @@ class TestEvaluatorInit:
     def test_evaluator_sets_total_step_zero(self) -> None:
         """Evaluator total_step initialises to zero."""
         pytest.importorskip("torch")
-        from erl_evaluator import Evaluator
-        from erl_config import Config
         from erl_agent import AgentD3QN
+        from erl_config import Config
+        from erl_evaluator import Evaluator
 
         env = _make_mock_env()
         env_args = {
@@ -190,9 +188,9 @@ class TestEvaluatorInit:
     def test_evaluator_recorder_starts_empty(self) -> None:
         """Evaluator recorder list starts empty."""
         pytest.importorskip("torch")
-        from erl_evaluator import Evaluator
-        from erl_config import Config
         from erl_agent import AgentD3QN
+        from erl_config import Config
+        from erl_evaluator import Evaluator
 
         env = _make_mock_env()
         env_args = {
@@ -220,9 +218,9 @@ class TestSaveOrLoadRecorder:
 
     def _make_evaluator(self, tmpdir: str):
         """Helper: construct an Evaluator pointed at tmpdir."""
-        from erl_evaluator import Evaluator
-        from erl_config import Config
         from erl_agent import AgentD3QN
+        from erl_config import Config
+        from erl_evaluator import Evaluator
 
         env = _make_mock_env()
         env_args = {

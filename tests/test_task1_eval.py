@@ -17,12 +17,12 @@ import pytest
 
 torch = pytest.importorskip("torch", reason="torch not installed")
 
-from exceptions import ModelError, DataFetchError
-
+from exceptions import DataFetchError, ModelError
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_evaluator(tmp_path=None):
     """Construct an EnsembleEvaluator with all environment calls mocked."""
@@ -37,6 +37,7 @@ def _make_evaluator(tmp_path=None):
 
     with patch("task1_eval.build_env", return_value=MagicMock()):
         from task1_eval import EnsembleEvaluator
+
         evaluator = EnsembleEvaluator(
             save_path=str(tmp_path) if tmp_path else "/tmp/eval",
             agent_classes=[],
@@ -49,24 +50,29 @@ def _make_evaluator(tmp_path=None):
 # to_python_number
 # ---------------------------------------------------------------------------
 
+
 class TestToPythonNumber:
     def test_tensor_scalar_to_float(self):
         from task1_eval import to_python_number
+
         t = torch.tensor(3.14)
         assert to_python_number(t) == pytest.approx(3.14, abs=1e-5)
 
     def test_plain_int_passthrough(self):
         from task1_eval import to_python_number
+
         assert to_python_number(42) == 42.0
 
     def test_plain_float_passthrough(self):
         from task1_eval import to_python_number
+
         assert to_python_number(2.5) == 2.5
 
 
 # ---------------------------------------------------------------------------
 # EnsembleEvaluator construction
 # ---------------------------------------------------------------------------
+
 
 class TestEnsembleEvaluatorInit:
     def test_default_cash_set(self):
@@ -88,6 +94,7 @@ class TestEnsembleEvaluatorInit:
         with patch("task1_eval.build_env", side_effect=RuntimeError("env broken")):
             with pytest.raises(DataFetchError):
                 from task1_eval import EnsembleEvaluator
+
                 EnsembleEvaluator(
                     save_path="/tmp/bad",
                     agent_classes=[],
@@ -98,6 +105,7 @@ class TestEnsembleEvaluatorInit:
 # ---------------------------------------------------------------------------
 # load_agents
 # ---------------------------------------------------------------------------
+
 
 class TestLoadAgents:
     def test_missing_checkpoint_dir_raises_model_error(self, tmp_path):
@@ -118,6 +126,7 @@ class TestLoadAgents:
 
         with patch("task1_eval.build_env", return_value=MagicMock()):
             from task1_eval import EnsembleEvaluator
+
             ev = EnsembleEvaluator(
                 save_path=str(tmp_path / "nonexistent"),
                 agent_classes=[mock_agent_class],
@@ -131,6 +140,7 @@ class TestLoadAgents:
 # ---------------------------------------------------------------------------
 # _ensemble_action
 # ---------------------------------------------------------------------------
+
 
 class TestEnsembleAction:
     def test_majority_wins(self):
@@ -156,34 +166,40 @@ class TestEnsembleAction:
 # Metrics integration (from metrics module)
 # ---------------------------------------------------------------------------
 
+
 class TestMetrics:
     def test_sharpe_ratio_finite_on_nonzero_std(self):
         from metrics import sharpe_ratio
+
         returns = np.array([0.01, -0.005, 0.02, -0.01, 0.015])
         sr = sharpe_ratio(returns)
         assert np.isfinite(sr)
 
     def test_sharpe_ratio_inf_on_zero_std(self):
         from metrics import sharpe_ratio
+
         returns = np.array([0.01, 0.01, 0.01])
         assert sharpe_ratio(returns) == float("inf")
 
     def test_max_drawdown_non_positive(self):
         from metrics import max_drawdown
+
         returns = np.array([0.1, -0.3, 0.05, -0.1])
         mdd = max_drawdown(returns)
         assert mdd <= 0.0
 
     def test_return_over_max_drawdown_positive(self):
         from metrics import return_over_max_drawdown
+
         # Mostly positive returns
         returns = np.array([0.02] * 50 + [-0.01] * 5)
         roma = return_over_max_drawdown(returns)
         assert np.isfinite(roma)
 
     def test_empty_returns_raise(self):
-        from metrics import sharpe_ratio, max_drawdown
         from exceptions import SignalError
+        from metrics import max_drawdown, sharpe_ratio
+
         with pytest.raises(SignalError):
             sharpe_ratio([])
         with pytest.raises(SignalError):

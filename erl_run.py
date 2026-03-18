@@ -15,14 +15,12 @@ from __future__ import annotations
 
 import os
 import time
-from multiprocessing import Pipe, Process
-from typing import Any, List, Optional, Tuple
+from multiprocessing import Process
+from typing import Any
 
 import numpy as np
 import torch
-import torch.nn as nn
 import torch.nn.modules.container as container
-import torch.nn.modules.linear as linear
 
 import erl_net
 from erl_config import Config, build_env
@@ -67,9 +65,9 @@ class Learner(Process):
 
     def __init__(
         self,
-        learner_pipe: Tuple[Any, Any],
-        worker_pipes: List[Tuple[Any, Any]],
-        evaluator_pipe: Tuple[Any, Any],
+        learner_pipe: tuple[Any, Any],
+        worker_pipes: list[tuple[Any, Any]],
+        evaluator_pipe: tuple[Any, Any],
         args: Config,
     ) -> None:
         super().__init__()
@@ -127,12 +125,8 @@ class Learner(Process):
             dtype=torch.float32,
             device=agent.device,
         )
-        rewards = torch.empty(
-            (horizon_len, num_seqs), dtype=torch.float32, device=agent.device
-        )
-        undones = torch.empty(
-            (horizon_len, num_seqs), dtype=torch.bool, device=agent.device
-        )
+        rewards = torch.empty((horizon_len, num_seqs), dtype=torch.float32, device=agent.device)
+        undones = torch.empty((horizon_len, num_seqs), dtype=torch.bool, device=agent.device)
         if if_off_policy:
             buffer_items_tensor: tuple = (states, actions, rewards, undones)
         else:
@@ -165,7 +159,7 @@ class Learner(Process):
 
             if self.eval_pipe.poll():
                 if_train = self.eval_pipe.recv()
-                actor: Optional[Any] = agent.act
+                actor: Any | None = agent.act
             else:
                 actor = None
 
@@ -196,8 +190,8 @@ class Worker(Process):
 
     def __init__(
         self,
-        worker_pipe: Tuple[Any, Any],
-        learner_pipe: Tuple[Any, Any],
+        worker_pipe: tuple[Any, Any],
+        learner_pipe: tuple[Any, Any],
         worker_id: int,
         args: Config,
     ) -> None:
@@ -228,9 +222,7 @@ class Worker(Process):
         if args.num_envs == 1:
             assert state.shape == (args.state_dim,)
             assert isinstance(state, np.ndarray)
-            state = torch.tensor(
-                state, dtype=torch.float32, device=agent.device
-            ).unsqueeze(0)
+            state = torch.tensor(state, dtype=torch.float32, device=agent.device).unsqueeze(0)
         else:
             assert state.shape == (args.num_envs, args.state_dim)
             assert isinstance(state, torch.Tensor)
@@ -268,7 +260,7 @@ class EvaluatorProc(Process):
 
     def __init__(
         self,
-        evaluator_pipe: Tuple[Any, Any],
+        evaluator_pipe: tuple[Any, Any],
         args: Config,
     ) -> None:
         super().__init__()
@@ -288,9 +280,7 @@ class EvaluatorProc(Process):
         cwd = args.cwd
         break_step = args.break_step
         device = torch.device(
-            f"cuda:{args.gpu_id}"
-            if (torch.cuda.is_available() and (args.gpu_id >= 0))
-            else "cpu"
+            f"cuda:{args.gpu_id}" if (torch.cuda.is_available() and (args.gpu_id >= 0)) else "cpu"
         )
         del args
 
@@ -304,9 +294,7 @@ class EvaluatorProc(Process):
                 actor = actor.to(device)
                 evaluator.evaluate_and_save(actor, steps, exp_r, logging_tuple)
 
-            if_train = (evaluator.total_step <= break_step) and (
-                not os.path.exists(f"{cwd}/stop")
-            )
+            if_train = (evaluator.total_step <= break_step) and (not os.path.exists(f"{cwd}/stop"))
             self.pipe.send(if_train)
 
         evaluator.save_training_curve_jpg()
@@ -362,9 +350,7 @@ def train_agent(args: Config) -> None:
             state_dim=args.state_dim,
             action_dim=1 if args.if_discrete else args.action_dim,
         )
-        buffer_items = agent.explore_env(
-            env, args.horizon_len * args.eval_times, if_random=True
-        )
+        buffer_items = agent.explore_env(env, args.horizon_len * args.eval_times, if_random=True)
         buffer.update(buffer_items)
     else:
         buffer = []
@@ -392,9 +378,7 @@ def train_agent(args: Config) -> None:
         action_count = np.ceil(action_count * 998).astype(int)
 
         position = buffer_items[0][:, :, 0].long().flatten().float()
-        position_count = torch.histc(
-            position, bins=env.max_position * 2 + 1, min=-2, max=2
-        )
+        position_count = torch.histc(position, bins=env.max_position * 2 + 1, min=-2, max=2)
         position_count = position_count.data.cpu().numpy() / position.shape[0]
         position_count = np.ceil(position_count * 998).astype(int)
 
@@ -417,9 +401,7 @@ def train_agent(args: Config) -> None:
         evaluator.evaluate_and_save(
             actor=agent.act, steps=horizon_len, exp_r=exp_r, logging_tuple=logging_tuple
         )
-        if_train = (evaluator.total_step <= break_step) and (
-            not os.path.exists(f"{cwd}/stop")
-        )
+        if_train = (evaluator.total_step <= break_step) and (not os.path.exists(f"{cwd}/stop"))
 
     elapsed = time.time() - evaluator.start_time
     log.info("training.complete", elapsed_s=round(elapsed), cwd=cwd)
@@ -443,7 +425,6 @@ def valid_agent(args: Config) -> None:
         args: Configuration object; ``eval_env_class`` and ``eval_env_args``
             must be set.
     """
-    from erl_agent import AgentD3QN  # local import to avoid circular deps
 
     cwd = f"{args.env_name}_D3QN_{args.gpu_id}"
     thresh = 0.001
@@ -484,9 +465,9 @@ def valid_agent(args: Config) -> None:
         tensor_action = tensor_q_values.argmax(dim=1)
 
         mask_zero_position = sim.position.eq(0)
-        mask_q_values = (
-            tensor_q_values.max(dim=1)[0] - tensor_q_values.mean(dim=1)
-        ).lt(torch.where(tensor_action.eq(2), thresh, thresh))
+        mask_q_values = (tensor_q_values.max(dim=1)[0] - tensor_q_values.mean(dim=1)).lt(
+            torch.where(tensor_action.eq(2), thresh, thresh)
+        )
         mask = torch.logical_and(mask_zero_position, mask_q_values)
         tensor_action[mask] = 1
 

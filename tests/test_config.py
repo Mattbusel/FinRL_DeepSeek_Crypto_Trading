@@ -122,6 +122,7 @@ class TestLARSASettingsValidation:
     def test_invalid_log_level_raises(self) -> None:
         """An unknown log level raises a validation error."""
         from pydantic import ValidationError
+
         from config import LARSASettings
 
         with pytest.raises(ValidationError):
@@ -145,6 +146,7 @@ class TestLARSASettingsValidation:
     def test_temperature_out_of_range_raises(self) -> None:
         """Temperature above 2.0 raises a validation error."""
         from pydantic import ValidationError
+
         from config import LARSASettings
 
         with pytest.raises(ValidationError):
@@ -153,6 +155,7 @@ class TestLARSASettingsValidation:
     def test_temperature_negative_raises(self) -> None:
         """Negative temperature raises a validation error."""
         from pydantic import ValidationError
+
         from config import LARSASettings
 
         with pytest.raises(ValidationError):
@@ -161,6 +164,7 @@ class TestLARSASettingsValidation:
     def test_max_tokens_zero_raises(self) -> None:
         """Zero max_tokens raises a validation error."""
         from pydantic import ValidationError
+
         from config import LARSASettings
 
         with pytest.raises(ValidationError):
@@ -169,6 +173,7 @@ class TestLARSASettingsValidation:
     def test_min_confidence_out_of_range_raises(self) -> None:
         """Confidence threshold above 1.0 raises a validation error."""
         from pydantic import ValidationError
+
         from config import LARSASettings
 
         with pytest.raises(ValidationError):

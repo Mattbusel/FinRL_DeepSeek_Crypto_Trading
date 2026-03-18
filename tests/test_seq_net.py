@@ -8,7 +8,6 @@ torch = pytest.importorskip("torch", reason="torch not installed")
 
 from seq_net import NnSeqBnMLP, RnnRegNet
 
-
 INP_DIM = 10
 MID_DIM = 16
 OUT_DIM = 4

@@ -18,7 +18,6 @@ from __future__ import annotations
 import logging
 import os
 import time
-from typing import List, Optional
 
 import numpy as np
 import pandas as pd
@@ -79,21 +78,21 @@ class Evaluator:
         self.out_dir: str = out_dir
         os.makedirs(out_dir, exist_ok=True)
 
-        self.step_idx: List[int] = []
-        self.step_sec: List[int] = []
+        self.step_idx: list[int] = []
+        self.step_sec: list[int] = []
 
-        self.tmp_train: List[TEN] = []
-        self.obj_train: List[TEN] = []
+        self.tmp_train: list[TEN] = []
+        self.obj_train: list[TEN] = []
 
-        self.tmp_valid: List[TEN] = []
-        self.obj_valid: List[TEN] = []
+        self.tmp_valid: list[TEN] = []
+        self.obj_valid: list[TEN] = []
 
         self.start_time: float = time.time()
 
         self.patience: int = 0
         self.best_valid_loss: float = th.inf
 
-    def update_obj_train(self, obj: Optional[TEN] = None) -> None:
+    def update_obj_train(self, obj: TEN | None = None) -> None:
         """Accumulate a training loss batch or finalise the epoch average.
 
         Call with a loss tensor to append to the running buffer; call with
@@ -110,7 +109,7 @@ class Evaluator:
         else:
             self.tmp_train.append(obj.mean(dim=(0, 1)).detach().cpu())
 
-    def update_obj_valid(self, obj: Optional[TEN] = None) -> None:
+    def update_obj_valid(self, obj: TEN | None = None) -> None:
         """Accumulate a validation loss batch or finalise the epoch average.
 
         Args:
@@ -159,8 +158,7 @@ class Evaluator:
 
         avg_valid_percent = (avg_valid * 1000).astype(int)
         log.info(
-            "train.step %6d  %6d sec  patience %d "
-            "| train %9.3e  valid %9.3e  pct%s",
+            "train.step %6d  %6d sec  patience %d | train %9.3e  valid %9.3e  pct%s",
             step_idx,
             time_used,
             self.patience,
@@ -189,9 +187,7 @@ class Evaluator:
                 reduce visual noise.
         """
         figure_path = (
-            figure_path
-            if figure_path
-            else f"{self.out_dir}/a_figure_loss_curve_{gpu_id}.jpg"
+            figure_path if figure_path else f"{self.out_dir}/a_figure_loss_curve_{gpu_id}.jpg"
         )
         step_idx: list = self.step_idx
         step_sec: list = self.step_sec
@@ -205,13 +201,9 @@ class Evaluator:
         step_sec = step_sec[ignore_num:]
         assert len(step_idx) == len(step_sec)
 
-        obj_train = (
-            th.stack(self.obj_train[ignore_num:], dim=0).detach().cpu().numpy()
-        )
+        obj_train = th.stack(self.obj_train[ignore_num:], dim=0).detach().cpu().numpy()
         avg_train = obj_train.mean(axis=1)
-        obj_valid = (
-            th.stack(self.obj_valid[ignore_num:], dim=0).detach().cpu().numpy()
-        )
+        obj_valid = th.stack(self.obj_valid[ignore_num:], dim=0).detach().cpu().numpy()
         avg_valid = obj_valid.mean(axis=1)
 
         plt = import_matplotlib_in_server()
@@ -240,8 +232,12 @@ class Evaluator:
 
         ax1 = axs[1]
         ax1.plot(
-            xs, avg_train, color=tl_color, linestyle=tl_style,
-            linewidth=tl_width, label="TrainAvg",
+            xs,
+            avg_train,
+            color=tl_color,
+            linestyle=tl_style,
+            linewidth=tl_width,
+            label="TrainAvg",
         )
         for label_i in range(obj_train.shape[1]):
             ax1.plot(xs, obj_train[:, label_i], alpha=alpha, label=f"Lab-{label_i}")
@@ -250,17 +246,19 @@ class Evaluator:
 
         ax2 = axs[2]
         ax2.plot(
-            xs, avg_valid, color=vl_color, linestyle=vl_style,
-            linewidth=vl_width, label="ValidAvg",
+            xs,
+            avg_valid,
+            color=vl_color,
+            linestyle=vl_style,
+            linewidth=vl_width,
+            label="ValidAvg",
         )
         for label_i in range(obj_valid.shape[1]):
             ax2.plot(xs, obj_valid[:, label_i], alpha=alpha, label=f"Lab-{label_i}")
         ax2.legend()
         ax2.grid()
 
-        plt.subplots_adjust(
-            left=0.05, right=0.98, top=0.98, bottom=0.05, hspace=0.05, wspace=0.05
-        )
+        plt.subplots_adjust(left=0.05, right=0.98, top=0.98, bottom=0.05, hspace=0.05, wspace=0.05)
         plt.savefig(figure_path, dpi=200)
         plt.close("all")
 
@@ -270,9 +268,7 @@ class Evaluator:
         Args:
             gpu_id: CUDA device index used to query memory statistics.
         """
-        device = th.device(
-            f"cuda:{gpu_id}" if (th.cuda.is_available() and gpu_id >= 0) else "cpu"
-        )
+        device = th.device(f"cuda:{gpu_id}" if (th.cuda.is_available() and gpu_id >= 0) else "cpu")
 
         if th.cuda.is_available():
             max_memo = th.cuda.max_memory_allocated(device=device)
@@ -284,7 +280,7 @@ class Evaluator:
         self.draw_train_valid_loss_curve(gpu_id=gpu_id)
         log.info(
             "evaluator.close GPU_GB=%.2f GPU_ratio=%.2f TimeUsed=%d",
-            max_memo / 2 ** 30,
+            max_memo / 2**30,
             max_memo / dev_memo,
             int(time.time() - self.start_time),
         )

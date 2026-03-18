@@ -8,8 +8,6 @@ Coverage targets:
 
 from __future__ import annotations
 
-import os
-import tempfile
 from unittest.mock import MagicMock, patch
 
 import numpy as np
@@ -21,6 +19,7 @@ th = pytest.importorskip("torch", reason="torch not installed")
 # ---------------------------------------------------------------------------
 # SeqData tests
 # ---------------------------------------------------------------------------
+
 
 class TestSeqData:
     """Tests for the SeqData data-loading and batching class."""
@@ -130,6 +129,7 @@ class TestSeqData:
 # ---------------------------------------------------------------------------
 # Sequence runner initialisation
 # ---------------------------------------------------------------------------
+
 
 class TestSeqRunConfig:
     """Tests for the ConfigData-compatible data path resolution."""

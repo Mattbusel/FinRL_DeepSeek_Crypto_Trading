@@ -38,8 +38,13 @@ class TestDataConfigPaths:
 
     def test_paths_are_strings(self):
         cfg = ConfigData()
-        for attr in ("csv_path", "input_ary_path", "label_ary_path",
-                     "predict_net_path", "predict_ary_path"):
+        for attr in (
+            "csv_path",
+            "input_ary_path",
+            "label_ary_path",
+            "predict_net_path",
+            "predict_ary_path",
+        ):
             assert isinstance(getattr(cfg, attr), str), f"{attr} should be str"
 
     def test_csv_path_has_expected_filename(self):
@@ -78,8 +83,13 @@ class TestSeqDataConfigData:
         from seq_data import ConfigData as SeqConfigData  # type: ignore
 
         cfg = SeqConfigData(data_dir="/tmp/seq")
-        for attr in ("csv_path", "input_ary_path", "label_ary_path",
-                     "predict_ary_path", "predict_net_path"):
+        for attr in (
+            "csv_path",
+            "input_ary_path",
+            "label_ary_path",
+            "predict_ary_path",
+            "predict_net_path",
+        ):
             val = getattr(cfg, attr, None)
             if val is not None:
                 assert "/tmp/seq" in val, f"{attr} should be under /tmp/seq"

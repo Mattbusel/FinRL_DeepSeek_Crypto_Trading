@@ -7,8 +7,8 @@ catch-able.
 
 from __future__ import annotations
 
-import sys
 import os
+import sys
 
 import pytest
 
@@ -109,7 +109,7 @@ class TestSubclasses:
     )
     def test_cause_preserved(self, exc_class) -> None:
         """Cause is preserved in subclass instances."""
-        cause = IOError("io issue")
+        cause = OSError("io issue")
         err = exc_class("wrapper", cause=cause)
         assert err.cause is cause
         # IOError is an alias for OSError in Python 3.3+; accept either name

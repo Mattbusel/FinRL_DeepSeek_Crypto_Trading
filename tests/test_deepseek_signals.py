@@ -2,18 +2,14 @@
 
 from __future__ import annotations
 
-import json
 import os
 import sys
 from unittest.mock import patch
-
-import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import deepseek_signals as ds
 from exceptions import SignalError
-
 
 # ---------------------------------------------------------------------------
 # Helpers / fixtures
@@ -39,6 +35,7 @@ RISK_KEYS = {"risk_score", "confidence_score_risk", "reasoning_risk"}
 # test_signal_extraction_returns_valid_keys
 # ---------------------------------------------------------------------------
 
+
 def test_signal_extraction_returns_valid_keys():
     """Mocked API should return a dict containing all required keys."""
     with patch.object(ds, "_call_api", return_value=VALID_SENTIMENT):
@@ -59,6 +56,7 @@ def test_risk_extraction_returns_valid_keys():
 # test_signal_fallback_on_api_error
 # ---------------------------------------------------------------------------
 
+
 def test_signal_fallback_on_api_error():
     """When the API raises, analyze_article_sentiment should return None."""
     with patch.object(ds, "_call_with_retry", side_effect=SignalError("API down")):
@@ -76,6 +74,7 @@ def test_risk_fallback_on_api_error():
 # ---------------------------------------------------------------------------
 # test_sentiment_values_in_range
 # ---------------------------------------------------------------------------
+
 
 def test_sentiment_score_in_range():
     """Returned sentiment_score must be in the documented 1-5 range."""

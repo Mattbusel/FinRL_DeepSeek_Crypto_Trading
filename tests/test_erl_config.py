@@ -1,7 +1,7 @@
 """Tests for erl_config.Config and related helpers."""
 
-import sys
 import os
+import sys
 
 import pytest
 
@@ -15,12 +15,15 @@ from erl_config import Config
 
 class _FakeOffPolicyAgent:
     """Minimal stand-in for an off-policy agent class."""
+
     pass
 
 
 class _FakeOnPolicyAgent:
     """Minimal stand-in for an on-policy agent (name contains 'PPO')."""
+
     pass
+
 
 _FakeOnPolicyAgent.__name__ = "AgentPPO"
 _FakeOffPolicyAgent.__name__ = "AgentD3QN"

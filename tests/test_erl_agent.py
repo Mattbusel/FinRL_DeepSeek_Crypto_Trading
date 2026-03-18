@@ -10,7 +10,6 @@ from erl_agent import AgentD3QN, AgentDoubleDQN, AgentTwinD3QN
 from erl_config import Config
 from erl_replay_buffer import ReplayBuffer
 
-
 STATE_DIM = 8
 ACTION_DIM = 3
 NET_DIMS = (32, 16)
@@ -125,6 +124,7 @@ class TestActionSelection:
 class TestSoftUpdate:
     def test_soft_update_moves_target_toward_current(self):
         import torch.nn as nn
+
         target = nn.Linear(4, 4)
         current = nn.Linear(4, 4)
 
@@ -141,6 +141,7 @@ class TestSoftUpdate:
 
     def test_soft_update_tau_zero_leaves_target_unchanged(self):
         import torch.nn as nn
+
         target = nn.Linear(4, 4)
         current = nn.Linear(4, 4)
 
@@ -157,6 +158,7 @@ class TestSoftUpdate:
 
     def test_soft_update_tau_one_copies_current(self):
         import torch.nn as nn
+
         target = nn.Linear(4, 4)
         current = nn.Linear(4, 4)
 
