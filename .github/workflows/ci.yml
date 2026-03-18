@@ -105,7 +105,7 @@ jobs:
           pip install --upgrade pip
           pip install -e ".[dev]" --no-deps
           pip install \
-            "empyrical>=0.5.5" \
+            "empyrical>=0.5.5; python_version < '3.12'" \
             "numpy>=1.24,<2.0" \
             "openai>=1.0.0" \
             "pandas>=2.0" \
