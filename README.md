@@ -7,11 +7,47 @@ and trains an ensemble of DQN-family agents that vote on trade decisions.
 
 ---
 
+## System Requirements
+
+- Python 3.10, 3.11, or 3.12
+- pip >= 23
+- CUDA-capable GPU (optional; all components run on CPU)
+- Internet access for DeepSeek API calls during signal extraction
+- ~4 GB disk space for data, model checkpoints, and dependencies
+
+---
+
 ## Architecture
 
 ```
-[BTC News] -> [DeepSeek V3 Signals] -> [RNN Factor Mining] ->
-[DQN Agent] -> [Ensemble Coordinator] -> [Trade Decisions]
+                     LARSA System Architecture
+  +---------------+    +---------------------+    +--------------+
+  |  BTC News     |    | DeepSeek V3 Signals |    |  RNN Factor  |
+  |  CSV data     |--->|  (sentiment + risk) |--->|    Miner     |
+  +---------------+    +---------------------+    +------+-------+
+                                                         |
+                             +---------------------------+
+                             v
+                    +-----------------+
+                    |  TradeSimulator |<--- BTC price ticks
+                    |  Environment   |
+                    +--------+--------+
+                             |
+             +---------------+---------------+
+             v               v               v
+        +---------+   +----------+   +--------------+
+        | AgentD3QN|  |AgentDDQN |   |AgentTwinD3QN |
+        +----+----+   +----+-----+   +------+-------+
+             +---------------+---------------+
+                             v
+                    +-----------------+
+                    |    Ensemble     |  majority-vote coordinator
+                    |  Coordinator   |  regime-aware weighting
+                    +--------+--------+
+                             v
+                    +-----------------+
+                    |   Evaluation    |  Sharpe, drawdown, RoMaD
+                    +-----------------+
 ```
 
 Detailed module flow:
@@ -39,48 +75,74 @@ task1_eval.py               Backtest on held-out data, reports
 
 ---
 
-## Environment Variables
+## Installation
+
+### 1. Clone and create a virtual environment
+
+```bash
+git clone https://github.com/mattbusel/FinRL_DeepSeek_Crypto_Trading.git
+cd FinRL_DeepSeek_Crypto_Trading
+
+python -m venv venv
+source venv/bin/activate      # Windows: venv\Scripts\activate
+```
+
+### 2. Install dependencies
+
+```bash
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+To also install development tools (pytest, mypy, ruff, black, isort):
+
+```bash
+pip install -e ".[dev]"
+```
+
+### 3. Set API keys
+
+```bash
+export DEEPSEEK_API_KEY="your-key-here"
+```
+
+Or create a `.env` file in the project root:
+
+```
+DEEPSEEK_API_KEY=your-key-here
+```
+
+---
+
+## Configuration Reference
+
+All settings are read from environment variables (or a `.env` file) and
+validated at startup via `config.py`. Defaults are shown below.
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `DEEPSEEK_API_KEY` | Yes | (none) | API key for the DeepSeek inference endpoint |
 | `DEEPSEEK_BASE_URL` | No | `https://api.deepseek.com/v1` | Endpoint URL |
 | `DEEPSEEK_MODEL` | No | `deepseek-chat` | Model identifier |
-| `DEEPSEEK_TEMPERATURE` | No | `0.0` | Sampling temperature |
+| `DEEPSEEK_TEMPERATURE` | No | `0.0` | Sampling temperature (0 = deterministic) |
+| `DEEPSEEK_MAX_TOKENS` | No | `300` | Max tokens per completion |
+| `MAX_RETRIES` | No | `5` | API retry attempts before giving up |
+| `CHECKPOINT_INTERVAL` | No | `10` | Save progress every N rows |
+| `MIN_CONFIDENCE_THRESHOLD` | No | `0.3` | Discard signals below this confidence |
 | `NUM_SIMS` | No | `4096` | Parallel simulation environments during training |
-| `RL_BREAK_STEP` | No | `32` | Stop training after this many steps |
+| `RL_BREAK_STEP` | No | `32` | Stop RL training after this many steps |
+| `RL_GAMMA` | No | `0.995` | Discount factor for future rewards |
+| `RL_LEARNING_RATE` | No | `2e-6` | Actor/critic learning rate |
+| `RL_BATCH_SIZE` | No | `512` | Mini-batch size for RL updates |
 | `DATA_DIR` | No | `./data` | Directory containing price and news data |
 | `OUTPUT_DIR` | No | `./output` | Directory for model checkpoints |
 | `LOG_LEVEL` | No | `INFO` | Logging verbosity: DEBUG, INFO, WARNING, ERROR |
 
-All settings are defined in `config.py` and can be set as environment variables
-or in a `.env` file in the project root.
-
 ---
 
-## Quickstart
+## Running Instructions
 
-### 1. Install dependencies
-
-```bash
-python -m venv venv
-source venv/bin/activate      # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-```
-
-### 2. Set API keys
-
-```bash
-export DEEPSEEK_API_KEY="your-key-here"
-```
-
-Or create a `.env` file:
-
-```
-DEEPSEEK_API_KEY=your-key-here
-```
-
-### 3. Extract news signals
+### Extract news signals
 
 ```bash
 python deepseek_signals.py \
@@ -88,20 +150,27 @@ python deepseek_signals.py \
   --output ./data/news_with_signals.csv
 ```
 
-### 4. Train the RNN factor miner
+Optional flags:
+
+```
+--min-confidence 0.5     # filter low-confidence results (default 0.3)
+--checkpoint-interval 20 # checkpoint every 20 rows (default 10)
+```
+
+### Train the RNN factor miner
 
 ```bash
 python seq_run.py
 ```
 
-### 5. Train the agent ensemble
+### Train the agent ensemble
 
 ```bash
 python task1_ensemble.py          # CPU
 python task1_ensemble.py 0        # GPU 0
 ```
 
-### 6. Evaluate on held-out data
+### Evaluate on held-out data
 
 ```bash
 python task1_eval.py
@@ -109,27 +178,33 @@ python task1_eval.py
 
 ---
 
-## Training Pipeline
+## Testing Instructions
 
-**Signal extraction** (`deepseek_signals.py`): Each news article is sent to the
-DeepSeek V3 API with a structured prompt requesting a `sentiment_score` (1-5)
-and a `risk_score` (1-5). Results are checkpointed every 10 rows so interrupted
-runs can resume. Low-confidence outputs are logged and optionally filtered.
+Install test dependencies:
 
-**Factor mining** (`seq_net.py`, `seq_run.py`): An `RnnRegNet` model combines
-LSTM and GRU layers with MLP projections. It is trained on Alpha101 factors
-augmented with the DeepSeek sentiment and risk signals to predict future price
-movements. Outputs serve as the state representation for the RL agents.
+```bash
+pip install -e ".[dev]"
+```
 
-**Agent training** (`erl_agent.py`, `task1_ensemble.py`): Three agent
-architectures are trained independently on `TradeSimulator-v0`:
-- `AgentD3QN` (Dueling Double DQN)
-- `AgentDoubleDQN` (Double DQN with twin Q-heads)
-- `AgentTwinD3QN` (Twin-network D3QN)
+Run the full test suite:
 
-Each agent uses an off-policy replay buffer with soft target-network updates.
-The `Ensemble` class collects all trained agents and performs majority-vote
-action selection at evaluation time.
+```bash
+pytest tests/ -v
+```
+
+Run with coverage report:
+
+```bash
+pytest tests/ --cov=. --cov-report=term-missing --cov-fail-under=60
+```
+
+Run only fast tests (exclude torch-dependent tests if torch is not installed):
+
+```bash
+pytest tests/test_config.py tests/test_exceptions.py tests/test_logger.py \
+       tests/test_deepseek_signals.py tests/test_deepseek_signals_extended.py \
+       -v
+```
 
 ---
 
@@ -149,92 +224,30 @@ task1_eval.py             Backtest evaluation on test data
 trade_simulator.py        TradeSimulator-v0 environment
 config.py                 Pydantic settings (all hyperparameters)
 exceptions.py             Custom exception hierarchy (LARSAError)
-logger.py                 Structured logging setup
-metrics.py                Sharpe, Sortino, max drawdown helpers
+logger.py                 Structured JSON logging setup
+metrics.py                Sharpe, max drawdown, RoMaD helpers
 data_config.py            Data path configuration
-tests/                    Pytest test suite
+tests/                    Pytest test suite (21+ test files)
 requirements.txt          Pinned dependencies
 pyproject.toml            Package metadata, ruff, mypy, pytest config
+.github/workflows/ci.yml  CI: lint, type-check, test with coverage
 ```
 
 ---
 
-## Running Tests
+## Logging
 
-```bash
-pip install pytest
-pytest tests/ -v
+All modules use structured JSON logging via `logger.py`:
+
+```python
+from logger import get_logger
+log = get_logger(__name__)
+log.info("pipeline.start", rows=1024, input="news.csv")
 ```
 
----
-
-## Configuration Reference
-
-All settings are managed by `config.py` via Pydantic. Each field maps to an
-upper-cased environment variable of the same name (e.g. `DEEPSEEK_API_KEY`).
-A `.env` file in the project root is also supported.
-
-| Variable | Default | Description |
-|---|---|---|
-| `DEEPSEEK_API_KEY` | `""` | API key for the DeepSeek inference endpoint (**required** for signal extraction) |
-| `DEEPSEEK_BASE_URL` | `https://api.deepseek.com/v1` | DeepSeek endpoint URL |
-| `DEEPSEEK_MODEL` | `deepseek-chat` | Model identifier |
-| `DEEPSEEK_TEMPERATURE` | `0.0` | Sampling temperature (0 = deterministic) |
-| `DEEPSEEK_MAX_TOKENS` | `300` | Max tokens per completion |
-| `MAX_RETRIES` | `5` | Max API retry attempts |
-| `MIN_CONFIDENCE_THRESHOLD` | `0.3` | Discard signals below this confidence |
-| `CHECKPOINT_INTERVAL` | `10` | Save checkpoint every N rows |
-| `RNN_BATCH_SIZE` | `256` | RNN training mini-batch size |
-| `RNN_EPOCHS` | `256` | RNN training epochs |
-| `RNN_LEARNING_RATE` | `0.001` | RNN AdamW learning rate |
-| `RL_LEARNING_RATE` | `2e-6` | RL agent learning rate |
-| `RL_BATCH_SIZE` | `512` | RL mini-batch size |
-| `RL_GAMMA` | `0.995` | Discount factor for future rewards |
-| `RL_BREAK_STEP` | `32` | Stop RL training after this many steps (×1e4) |
-| `NUM_SIMS` | `4096` | Parallel simulation environments during training |
-| `MAX_POSITION` | `1` | Maximum absolute BTC position |
-| `SLIPPAGE` | `7e-7` | Per-trade slippage fraction |
-| `STARTING_CASH` | `1000000` | Initial cash for evaluation |
-| `DATA_DIR` | `./data` | Directory containing price and news data |
-| `OUTPUT_DIR` | `./output` | Directory for checkpoints and artefacts |
-| `LOG_LEVEL` | `INFO` | Logging verbosity: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` |
-
----
-
-## Metrics
-
-The evaluation pipeline reports three financial metrics:
-
-| Metric | Description |
-|---|---|
-| **Sharpe Ratio** | `(mean_return - risk_free) / std_return` — risk-adjusted return |
-| **Max Drawdown** | Largest peak-to-trough decline in cumulative returns |
-| **RoMaD** | Return-over-Max-Drawdown (Calmar-style ratio) |
-
----
-
-## Development
-
-```bash
-# Install with dev extras
-pip install -e ".[dev]"
-
-# Run linter
-ruff check .
-
-# Type-check
-mypy config.py exceptions.py metrics.py logger.py deepseek_signals.py
-
-# Run tests with coverage
-pytest tests/ --cov=. --cov-report=term-missing
-```
-
----
-
-## License
-
-This project is released under the **MIT License**. See the
-[LICENSE](LICENSE) file for details.
+Log level is controlled by the `LOG_LEVEL` environment variable (default `INFO`).
+Log records are emitted as single-line JSON to stdout, suitable for ingestion by
+log aggregators (Datadog, CloudWatch, Splunk, etc.).
 
 ---
 
