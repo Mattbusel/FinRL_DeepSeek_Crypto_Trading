@@ -3,8 +3,9 @@
 import sys
 import os
 
-import torch
 import pytest
+
+torch = pytest.importorskip("torch", reason="torch not installed")
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 

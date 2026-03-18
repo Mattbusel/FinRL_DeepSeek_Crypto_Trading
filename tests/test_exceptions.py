@@ -1,8 +1,18 @@
-"""Tests for the custom exception hierarchy in exceptions.py."""
+"""Tests for the exceptions.py module.
+
+Verifies the LARSA custom exception hierarchy: inheritance, message
+formatting, cause chaining, and that each subclass is independently
+catch-able.
+"""
 
 from __future__ import annotations
 
+import sys
+import os
+
 import pytest
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from exceptions import (
     ConfigError,
@@ -14,107 +24,113 @@ from exceptions import (
 
 
 class TestLARSAError:
-    def test_message_is_stored(self):
-        err = LARSAError("base error")
-        assert str(err) == "base error"
+    """Tests for the base :class:`LARSAError`."""
 
-    def test_cause_none_by_default(self):
-        err = LARSAError("no cause")
+    def test_message_stored(self) -> None:
+        """The message is accessible via str()."""
+        err = LARSAError("base error")
+        assert "base error" in str(err)
+
+    def test_cause_none_by_default(self) -> None:
+        """Cause defaults to None."""
+        err = LARSAError("msg")
         assert err.cause is None
 
-    def test_cause_is_stored(self):
-        inner = ValueError("inner")
-        err = LARSAError("outer", cause=inner)
-        assert err.cause is inner
+    def test_cause_stored(self) -> None:
+        """Cause is stored and accessible."""
+        original = ValueError("root cause")
+        err = LARSAError("wrapped", cause=original)
+        assert err.cause is original
 
-    def test_str_with_cause_contains_both_messages(self):
-        inner = ValueError("inner detail")
-        err = LARSAError("outer message", cause=inner)
-        rendered = str(err)
-        assert "outer message" in rendered
-        assert "inner detail" in rendered
+    def test_str_with_cause_includes_cause(self) -> None:
+        """str() includes the cause type and message when cause is set."""
+        cause = RuntimeError("something bad")
+        err = LARSAError("outer error", cause=cause)
+        text = str(err)
+        assert "RuntimeError" in text
+        assert "something bad" in text
 
-    def test_is_exception(self):
+    def test_str_without_cause_clean(self) -> None:
+        """str() without a cause is just the message."""
+        err = LARSAError("clean message")
+        assert str(err) == "clean message"
+
+    def test_is_exception(self) -> None:
+        """LARSAError is a subclass of Exception."""
         assert issubclass(LARSAError, Exception)
 
-    def test_can_raise_and_catch(self):
-        with pytest.raises(LARSAError, match="raised"):
-            raise LARSAError("raised")
-
-
-class TestDataFetchError:
-    def test_is_larsa_error(self):
-        assert issubclass(DataFetchError, LARSAError)
-
-    def test_message_stored(self):
-        err = DataFetchError("file not found")
-        assert "file not found" in str(err)
-
-    def test_cause_propagated(self):
-        inner = OSError("disk error")
-        err = DataFetchError("cannot load data", cause=inner)
-        assert err.cause is inner
-        assert "disk error" in str(err)
-
-    def test_can_raise_and_catch_as_larsa(self):
+    def test_raise_and_catch(self) -> None:
+        """LARSAError can be raised and caught."""
         with pytest.raises(LARSAError):
-            raise DataFetchError("data missing")
+            raise LARSAError("test raise")
 
 
-class TestModelError:
-    def test_is_larsa_error(self):
-        assert issubclass(ModelError, LARSAError)
+class TestSubclasses:
+    """Tests that all subclasses inherit LARSAError and can be caught."""
 
-    def test_message_stored(self):
-        err = ModelError("checkpoint missing")
-        assert "checkpoint missing" in str(err)
+    @pytest.mark.parametrize(
+        "exc_class",
+        [DataFetchError, ModelError, SignalError, ConfigError],
+    )
+    def test_inherits_larsa_error(self, exc_class) -> None:
+        """Each subclass is a subclass of LARSAError."""
+        assert issubclass(exc_class, LARSAError)
 
-    def test_cause_propagated(self):
-        inner = FileNotFoundError("actor.pth")
-        err = ModelError("model load failed", cause=inner)
-        assert err.cause is inner
-
-    def test_can_raise_and_catch_as_larsa(self):
+    @pytest.mark.parametrize(
+        "exc_class",
+        [DataFetchError, ModelError, SignalError, ConfigError],
+    )
+    def test_caught_by_larsa_error(self, exc_class) -> None:
+        """Each subclass instance is caught by except LARSAError."""
         with pytest.raises(LARSAError):
-            raise ModelError("bad model")
+            raise exc_class("test")
+
+    @pytest.mark.parametrize(
+        "exc_class",
+        [DataFetchError, ModelError, SignalError, ConfigError],
+    )
+    def test_caught_by_own_class(self, exc_class) -> None:
+        """Each subclass instance is caught by its own class."""
+        with pytest.raises(exc_class):
+            raise exc_class("test")
+
+    @pytest.mark.parametrize(
+        "exc_class",
+        [DataFetchError, ModelError, SignalError, ConfigError],
+    )
+    def test_message_preserved(self, exc_class) -> None:
+        """Message is preserved in subclass instances."""
+        err = exc_class("specific message")
+        assert "specific message" in str(err)
+
+    @pytest.mark.parametrize(
+        "exc_class",
+        [DataFetchError, ModelError, SignalError, ConfigError],
+    )
+    def test_cause_preserved(self, exc_class) -> None:
+        """Cause is preserved in subclass instances."""
+        cause = IOError("io issue")
+        err = exc_class("wrapper", cause=cause)
+        assert err.cause is cause
+        # IOError is an alias for OSError in Python 3.3+; accept either name
+        assert "OSError" in str(err) or "IOError" in str(err)
 
 
-class TestSignalError:
-    def test_is_larsa_error(self):
-        assert issubclass(SignalError, LARSAError)
+class TestExceptionIsolation:
+    """Ensure catching one subclass does not catch another."""
 
-    def test_message_stored(self):
-        err = SignalError("api failed")
-        assert "api failed" in str(err)
+    def test_data_fetch_not_caught_as_model_error(self) -> None:
+        """DataFetchError is not caught by except ModelError."""
+        with pytest.raises(DataFetchError):
+            try:
+                raise DataFetchError("data")
+            except ModelError:
+                pass  # should not reach here
 
-    def test_cause_propagated(self):
-        inner = RuntimeError("connection refused")
-        err = SignalError("deepseek unreachable", cause=inner)
-        assert err.cause is inner
-        assert "connection refused" in str(err)
-
-    def test_can_raise_and_catch_as_larsa(self):
-        with pytest.raises(LARSAError):
-            raise SignalError("signal extraction failed")
-
-
-class TestConfigError:
-    def test_is_larsa_error(self):
-        assert issubclass(ConfigError, LARSAError)
-
-    def test_message_stored(self):
-        err = ConfigError("invalid learning rate")
-        assert "invalid learning rate" in str(err)
-
-    def test_cause_propagated(self):
-        inner = KeyError("DEEPSEEK_API_KEY")
-        err = ConfigError("missing env var", cause=inner)
-        assert err.cause is inner
-
-    def test_can_raise_and_catch_as_larsa(self):
-        with pytest.raises(LARSAError):
-            raise ConfigError("bad config")
-
-    def test_can_catch_specifically(self):
-        with pytest.raises(ConfigError):
-            raise ConfigError("specific")
+    def test_signal_error_not_caught_as_config_error(self) -> None:
+        """SignalError is not caught by except ConfigError."""
+        with pytest.raises(SignalError):
+            try:
+                raise SignalError("signal")
+            except ConfigError:
+                pass

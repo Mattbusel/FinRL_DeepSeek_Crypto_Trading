@@ -168,6 +168,76 @@ pytest tests/ -v
 
 ---
 
+## Configuration Reference
+
+All settings are managed by `config.py` via Pydantic. Each field maps to an
+upper-cased environment variable of the same name (e.g. `DEEPSEEK_API_KEY`).
+A `.env` file in the project root is also supported.
+
+| Variable | Default | Description |
+|---|---|---|
+| `DEEPSEEK_API_KEY` | `""` | API key for the DeepSeek inference endpoint (**required** for signal extraction) |
+| `DEEPSEEK_BASE_URL` | `https://api.deepseek.com/v1` | DeepSeek endpoint URL |
+| `DEEPSEEK_MODEL` | `deepseek-chat` | Model identifier |
+| `DEEPSEEK_TEMPERATURE` | `0.0` | Sampling temperature (0 = deterministic) |
+| `DEEPSEEK_MAX_TOKENS` | `300` | Max tokens per completion |
+| `MAX_RETRIES` | `5` | Max API retry attempts |
+| `MIN_CONFIDENCE_THRESHOLD` | `0.3` | Discard signals below this confidence |
+| `CHECKPOINT_INTERVAL` | `10` | Save checkpoint every N rows |
+| `RNN_BATCH_SIZE` | `256` | RNN training mini-batch size |
+| `RNN_EPOCHS` | `256` | RNN training epochs |
+| `RNN_LEARNING_RATE` | `0.001` | RNN AdamW learning rate |
+| `RL_LEARNING_RATE` | `2e-6` | RL agent learning rate |
+| `RL_BATCH_SIZE` | `512` | RL mini-batch size |
+| `RL_GAMMA` | `0.995` | Discount factor for future rewards |
+| `RL_BREAK_STEP` | `32` | Stop RL training after this many steps (×1e4) |
+| `NUM_SIMS` | `4096` | Parallel simulation environments during training |
+| `MAX_POSITION` | `1` | Maximum absolute BTC position |
+| `SLIPPAGE` | `7e-7` | Per-trade slippage fraction |
+| `STARTING_CASH` | `1000000` | Initial cash for evaluation |
+| `DATA_DIR` | `./data` | Directory containing price and news data |
+| `OUTPUT_DIR` | `./output` | Directory for checkpoints and artefacts |
+| `LOG_LEVEL` | `INFO` | Logging verbosity: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` |
+
+---
+
+## Metrics
+
+The evaluation pipeline reports three financial metrics:
+
+| Metric | Description |
+|---|---|
+| **Sharpe Ratio** | `(mean_return - risk_free) / std_return` — risk-adjusted return |
+| **Max Drawdown** | Largest peak-to-trough decline in cumulative returns |
+| **RoMaD** | Return-over-Max-Drawdown (Calmar-style ratio) |
+
+---
+
+## Development
+
+```bash
+# Install with dev extras
+pip install -e ".[dev]"
+
+# Run linter
+ruff check .
+
+# Type-check
+mypy config.py exceptions.py metrics.py logger.py deepseek_signals.py
+
+# Run tests with coverage
+pytest tests/ --cov=. --cov-report=term-missing
+```
+
+---
+
+## License
+
+This project is released under the **MIT License**. See the
+[LICENSE](LICENSE) file for details.
+
+---
+
 ## Contact
 
 Author: Matthew C. Busel

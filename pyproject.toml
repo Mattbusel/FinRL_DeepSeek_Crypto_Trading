@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.backends.legacy:build"
 
 [project]
-name = "larsa-trading"
+name = "finrl-deepseek-crypto"
 version = "1.0.0"
 description = "LLM-Augmented Regime-Switching Agent for BTC crypto trading"
 readme = "README.md"
@@ -11,6 +11,38 @@ license = { text = "MIT" }
 requires-python = ">=3.10"
 authors = [{ name = "Matthew C. Busel", email = "mattbusel@gmail.com" }]
 keywords = ["reinforcement-learning", "trading", "deepseek", "crypto", "bitcoin"]
+
+dependencies = [
+    "certifi>=2024.12.14",
+    "charset-normalizer>=3.4.1",
+    "empyrical>=0.5.5",
+    "filelock>=3.16.1",
+    "matplotlib>=3.10.1",
+    "numpy>=1.24.4,<2.0",
+    "openai>=1.0.0",
+    "pandas>=2.0.3",
+    "pandas-datareader>=0.10.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "python-dateutil>=2.9.0",
+    "requests>=2.32.3",
+    "scipy>=1.10.1",
+    "torch>=2.4.1",
+    "typing-extensions>=4.12.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=5.0",
+    "pytest-mock>=3.12",
+    "black>=24.0",
+    "isort>=5.13",
+    "mypy>=1.10",
+    "ruff>=0.4.0",
+]
+
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
@@ -25,19 +57,40 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = ["-v", "--tb=short"]
+addopts = ["-v", "--tb=short", "--strict-markers"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks integration tests that require data files",
+]
 
 [tool.ruff]
 line-length = 100
 target-version = "py310"
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "UP", "B"]
-ignore = ["E501"]
+select = ["E", "F", "W", "I", "UP", "B", "C4", "SIM"]
+ignore = [
+    "E501",   # line too long — handled by formatter
+    "B008",   # do not perform function calls in default arguments
+    "UP007",  # use X | Y for union types — keep compat with Python 3.9
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]  # allow assert in tests
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
 
 [tool.mypy]
 python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
+warn_unused_ignores = true
+no_implicit_reexport = true
 ignore_missing_imports = true
-exclude = ["tests/"]
+exclude = ["tests/", "seq_data\\.py", "seq_net\\.py", "seq_record\\.py"]
+
+[[tool.mypy.overrides]]
+module = ["empyrical.*", "torch.*", "pandas.*", "numpy.*"]
+ignore_missing_imports = true

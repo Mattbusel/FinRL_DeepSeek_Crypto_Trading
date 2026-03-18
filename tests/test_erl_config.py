@@ -5,6 +5,8 @@ import os
 
 import pytest
 
+pytest.importorskip("torch", reason="torch not installed")
+
 # Ensure project root is on path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 

@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import pytest
-import torch
+
+torch = pytest.importorskip("torch", reason="torch not installed")
 
 from seq_net import NnSeqBnMLP, RnnRegNet
 

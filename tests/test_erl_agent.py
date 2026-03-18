@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import pytest
-import torch
+
+torch = pytest.importorskip("torch", reason="torch not installed")
 
 from erl_agent import AgentD3QN, AgentDoubleDQN, AgentTwinD3QN
 from erl_config import Config
