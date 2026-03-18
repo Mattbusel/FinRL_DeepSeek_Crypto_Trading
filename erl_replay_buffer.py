@@ -169,7 +169,7 @@ class ReplayBuffer:  # for off-policy
             for item, name in item_names:
                 file_path = f"{cwd}/replay_buffer_{name}.pth"
                 logger.info("| buffer.save_or_load_history(): Load %s", file_path)
-                buf_item = torch.load(file_path)
+                buf_item = torch.load(file_path, weights_only=True)  # nosec B614
 
                 max_size = buf_item.shape[0]
                 item[:max_size] = buf_item

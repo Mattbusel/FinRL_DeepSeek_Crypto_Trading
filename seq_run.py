@@ -267,7 +267,7 @@ def valid_model(gpu_id: int) -> None:
     net = RnnRegNet(
         inp_dim=input_dim, mid_dim=mid_dim, out_dim=label_dim, num_layers=num_layers
     ).to(device)
-    net.load_state_dict(th.load(predict_net_path, map_location=lambda storage, loc: storage))
+    net.load_state_dict(th.load(predict_net_path, map_location=lambda storage, loc: storage, weights_only=True))  # nosec B614
 
     predict_ary = np.empty_like(seq_data.valid_label_seq)
     hid: TEN | None = None
