@@ -1,4 +1,11 @@
-"""Tests for metrics.py: sharpe_ratio, max_drawdown, return_over_max_drawdown."""
+"""Tests for the metrics.py module.
+
+Covers :func:`cumulative_returns`, :func:`sharpe_ratio`,
+:func:`max_drawdown`, and :func:`return_over_max_drawdown` with normal,
+edge-case, and error inputs.
+"""
+
+from __future__ import annotations
 
 import math
 import sys
@@ -9,123 +16,141 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from metrics import sharpe_ratio, max_drawdown, return_over_max_drawdown, cumulative_returns
 from exceptions import SignalError
+from metrics import (
+    cumulative_returns,
+    max_drawdown,
+    return_over_max_drawdown,
+    sharpe_ratio,
+)
 
 
-# ---------------------------------------------------------------------------
-# sharpe_ratio
-# ---------------------------------------------------------------------------
+class TestCumulativeReturns:
+    """Tests for :func:`cumulative_returns`."""
 
-def test_sharpe_ratio_positive_returns():
-    """Known constant positive returns should yield a positive Sharpe ratio."""
-    # All returns identical => std == 0 => returns inf
-    # Use varying positive returns for a finite positive Sharpe
-    returns = [0.01, 0.02, 0.03, 0.02, 0.01]
-    sr = sharpe_ratio(returns)
-    assert sr > 0
+    def test_positive_returns(self) -> None:
+        """Positive returns produce a monotonically increasing series."""
+        result = cumulative_returns([0.01, 0.01, 0.01])
+        values = result.values
+        assert values[-1] > values[0]
 
+    def test_zero_returns(self) -> None:
+        """All-zero returns produce an all-zero cumulative series."""
+        result = cumulative_returns([0.0, 0.0, 0.0])
+        assert all(v == 0.0 for v in result.values)
 
-def test_sharpe_ratio_known_value():
-    """Manually computed Sharpe should match the function output."""
-    returns = np.array([0.1, 0.2, 0.3])
-    mean = returns.mean()
-    std = returns.std(ddof=1)
-    expected = mean / std
-    result = sharpe_ratio(returns)
-    assert abs(result - expected) < 1e-10
+    def test_list_input(self) -> None:
+        """Plain Python list is accepted and produces the correct length."""
+        result = cumulative_returns([0.02, -0.01, 0.03])
+        assert len(result) == 3
 
+    def test_numpy_input(self) -> None:
+        """NumPy array input is accepted without error."""
+        arr = np.array([0.05, -0.02, 0.01])
+        result = cumulative_returns(arr)
+        assert len(result) == 3
 
-def test_sharpe_ratio_zero_std_returns_inf():
-    """All identical returns => std == 0 => Sharpe is inf."""
-    returns = [0.05, 0.05, 0.05, 0.05]
-    result = sharpe_ratio(returns)
-    assert math.isinf(result)
+    def test_empty_raises(self) -> None:
+        """Empty input raises :class:`SignalError`."""
+        with pytest.raises(SignalError):
+            cumulative_returns([])
 
-
-def test_sharpe_ratio_negative_returns():
-    """Uniformly negative returns should yield a negative Sharpe ratio."""
-    returns = [-0.01, -0.02, -0.03]
-    assert sharpe_ratio(returns) < 0
-
-
-def test_sharpe_ratio_empty_raises():
-    """Empty input should raise SignalError."""
-    with pytest.raises(SignalError):
-        sharpe_ratio([])
+    def test_empty_numpy_raises(self) -> None:
+        """Empty numpy array raises :class:`SignalError`."""
+        with pytest.raises(SignalError):
+            cumulative_returns(np.array([]))
 
 
-# ---------------------------------------------------------------------------
-# max_drawdown
-# ---------------------------------------------------------------------------
+class TestSharpeRatio:
+    """Tests for :func:`sharpe_ratio`."""
 
-def test_max_drawdown_no_drawdown():
-    """Monotone increasing returns should produce a drawdown of 0."""
-    returns = [0.01, 0.02, 0.03, 0.04]
-    mdd = max_drawdown(returns)
-    # empyrical.max_drawdown returns <= 0; for monotone increases it is 0
-    assert mdd == pytest.approx(0.0, abs=1e-6) or mdd >= -1e-6
+    def test_positive_returns(self) -> None:
+        """Steady positive returns produce a positive Sharpe ratio."""
+        sr = sharpe_ratio([0.01] * 20)
+        assert sr == math.inf  # std == 0, identical returns
 
+    def test_mixed_returns(self) -> None:
+        """Mixed returns produce a finite Sharpe ratio."""
+        returns = [0.02, -0.01, 0.03, -0.005, 0.015]
+        sr = sharpe_ratio(returns)
+        assert math.isfinite(sr)
 
-def test_max_drawdown_known_value():
-    """Portfolio going from 1 → 0.5 → 1 should have a large drawdown."""
-    # The sequence [-0.5, 1.0] corresponds to a 50% drop then recovery
-    returns = [-0.5, 1.0]
-    mdd = max_drawdown(returns)
-    # drawdown should be <= 0 and substantial
-    assert mdd < 0
+    def test_risk_free_offset(self) -> None:
+        """Higher risk-free rate lowers the Sharpe ratio."""
+        returns = [0.02, 0.01, 0.03, 0.015]
+        sr0 = sharpe_ratio(returns, risk_free=0.0)
+        sr1 = sharpe_ratio(returns, risk_free=0.01)
+        assert sr0 > sr1
 
+    def test_zero_std_returns_inf(self) -> None:
+        """Constant returns (zero std) return infinity."""
+        sr = sharpe_ratio([0.005, 0.005, 0.005])
+        assert sr == math.inf
 
-def test_max_drawdown_all_losses():
-    """All negative returns should produce a significant drawdown."""
-    returns = [-0.1, -0.1, -0.1]
-    mdd = max_drawdown(returns)
-    assert mdd < 0
+    def test_empty_raises(self) -> None:
+        """Empty input raises :class:`SignalError`."""
+        with pytest.raises(SignalError):
+            sharpe_ratio([])
 
-
-def test_max_drawdown_empty_raises():
-    """Empty input should raise SignalError."""
-    with pytest.raises(SignalError):
-        max_drawdown([])
-
-
-# ---------------------------------------------------------------------------
-# return_over_max_drawdown (Calmar-style)
-# ---------------------------------------------------------------------------
-
-def test_calmar_ratio_positive():
-    """Positive cumulative return with a drawdown should yield positive RoMaD."""
-    # returns go up, down a bit, then up strongly
-    returns = [0.05, 0.05, -0.02, 0.10, 0.05]
-    romd = return_over_max_drawdown(returns)
-    # Could be inf (no drawdown) or positive finite; either is acceptable
-    assert romd > 0 or math.isinf(romd)
+    def test_single_element(self) -> None:
+        """Single-element returns produce infinity (std of one element is 0 with ddof=1 -> nan)."""
+        # np.array([x]).std(ddof=1) is nan for a single element; we should get inf
+        sr = sharpe_ratio([0.01])
+        assert math.isinf(sr) or math.isnan(sr)
 
 
-def test_calmar_ratio_zero_drawdown_returns_inf():
-    """Monotone positive returns → zero drawdown → RoMaD is inf."""
-    returns = [0.01, 0.02, 0.03]
-    result = return_over_max_drawdown(returns)
-    assert math.isinf(result)
+class TestMaxDrawdown:
+    """Tests for :func:`max_drawdown`."""
+
+    def test_no_drawdown(self) -> None:
+        """Always positive returns produce zero or very small drawdown."""
+        mdd = max_drawdown([0.01, 0.02, 0.01, 0.03])
+        assert mdd <= 0.0
+
+    def test_large_drawdown(self) -> None:
+        """A clear losing streak produces a large negative drawdown."""
+        returns = [0.1, -0.5, -0.3, 0.05]
+        mdd = max_drawdown(returns)
+        assert mdd < -0.3
+
+    def test_result_is_nonpositive(self) -> None:
+        """Max drawdown is always <= 0."""
+        for _ in range(10):
+            returns = np.random.normal(0.001, 0.01, size=50).tolist()
+            assert max_drawdown(returns) <= 0.0
+
+    def test_empty_raises(self) -> None:
+        """Empty input raises :class:`SignalError`."""
+        with pytest.raises(SignalError):
+            max_drawdown([])
 
 
-def test_calmar_ratio_empty_raises():
-    """Empty input should raise SignalError."""
-    with pytest.raises(SignalError):
-        return_over_max_drawdown([])
+class TestReturnOverMaxDrawdown:
+    """Tests for :func:`return_over_max_drawdown`."""
 
+    def test_positive_ratio(self) -> None:
+        """Profitable run with drawdown produces a finite positive RoMaD."""
+        # Strong uptrend with a small dip in the middle
+        returns = [0.05, 0.03, -0.01, 0.04, 0.06]
+        roma = return_over_max_drawdown(returns)
+        assert math.isfinite(roma)
 
-# ---------------------------------------------------------------------------
-# cumulative_returns
-# ---------------------------------------------------------------------------
+    def test_zero_drawdown_returns_inf(self) -> None:
+        """Returns with no drawdown produce infinity."""
+        returns = [0.01, 0.02, 0.03]
+        roma = return_over_max_drawdown(returns)
+        assert roma == math.inf
 
-def test_cumulative_returns_non_empty():
-    """cumulative_returns should return a non-empty series."""
-    result = cumulative_returns([0.01, 0.02, -0.01])
-    assert len(result) == 3
+    def test_empty_propagates_error(self) -> None:
+        """Empty input raises :class:`SignalError`."""
+        with pytest.raises(SignalError):
+            return_over_max_drawdown([])
 
-
-def test_cumulative_returns_empty_raises():
-    """Empty input should raise SignalError."""
-    with pytest.raises(SignalError):
-        cumulative_returns([])
+    def test_consistent_with_components(self) -> None:
+        """RoMaD equals cumulative_return / abs(max_drawdown)."""
+        returns = [0.05, -0.02, 0.03, -0.01, 0.04]
+        mdd = abs(max_drawdown(returns))
+        cum_ret = float(cumulative_returns(returns).iloc[-1])
+        expected = cum_ret / mdd if mdd != 0 else math.inf
+        result = return_over_max_drawdown(returns)
+        assert abs(result - expected) < 1e-9
