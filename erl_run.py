@@ -446,7 +446,9 @@ def valid_agent(args: Config) -> None:
         [f for f in os.listdir(cwd) if len(f) == len("actor_00154050_000.664.pth")]
     )[-1]
     agent.act.load_state_dict(
-        torch.load(f"{cwd}/{agent_path}", map_location=agent.device, weights_only=False).state_dict()  # nosec B614
+        torch.load(
+            f"{cwd}/{agent_path}", map_location=agent.device, weights_only=False
+        ).state_dict()  # nosec B614
     )
 
     actor = agent.act
