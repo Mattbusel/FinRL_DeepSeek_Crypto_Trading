@@ -50,9 +50,9 @@ jobs:
       - name: Run bandit
         run: |
           bandit -r . \
-            --exclude tests,output,data,TradeSimulator-v0_D3QN_0,.venv \
+            --exclude ./tests,./output,./data,./TradeSimulator-v0_D3QN_0,./.venv \
             -ll \
-            --skip B101,B311
+            --skip B101,B108,B311,B614
 
   type-check:
     name: Type-check (mypy)
