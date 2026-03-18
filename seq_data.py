@@ -21,6 +21,12 @@ class ConfigData:
         self.predict_net_path = f"{data_dir}/BTC_1sec_predict.pth"
 
 def convert_csv_to_level5_csv():
+    """Convert a raw BTC order-book CSV to a level-5 order-book CSV.
+
+    Reads the CSV path from :class:`ConfigData`, drops unnecessary columns, keeps
+    only the top-5 bid/ask levels (distance, notional, cancel notional, limit
+    notional), sorts by ``system_time``, and overwrites the same file in-place.
+    """
     args = ConfigData()
     load_csv_path = args.csv_path
     save_csv_path = args.csv_path
@@ -53,6 +59,11 @@ def convert_csv_to_level5_csv():
 
 
 def check_btc_1s_csv():
+    """Print the BTC 1-second CSV to stdout for a quick sanity check.
+
+    Reads the CSV path from :class:`ConfigData` and prints the resulting
+    DataFrame so the caller can verify column names and row counts.
+    """
     args = ConfigData()
 
     df = pd.read_csv(args.csv_path)
@@ -84,7 +95,16 @@ PERIOD = 10
 
 
 # region Auxiliary functions
-def ref(s, n=1):  # 对序列整体下移动N,返回序列(shift后会产生NAN)
+def ref(s, n=1):
+    """Shift a sequence by n periods (pandas shift wrapper).
+
+    Args:
+        s: Array-like input sequence.
+        n: Number of periods to shift (default 1). Produces NaN for the first n elements.
+
+    Returns:
+        numpy.ndarray with values shifted by n positions.
+    """
     return pd.Series(s).shift(n).values
 
 
@@ -110,6 +130,17 @@ def sma(df, window=WINDOW):
 
 
 def ema(df, window, *, adjust=True, min_periods=1):
+    """Wrapper function to estimate exponential moving average.
+
+    Args:
+        df: A pandas DataFrame or Series.
+        window: Span (half-life) for the EWM calculation.
+        adjust: Whether to use adjustment factors for EWM (default True).
+        min_periods: Minimum observations required before producing a result (default 1).
+
+    Returns:
+        A pandas DataFrame or Series with the exponential moving average.
+    """
     return df.ewm(ignore_na=False, span=window, min_periods=min_periods, adjust=adjust).mean()
 
 
@@ -1228,6 +1259,20 @@ class TechIndicator:
 
 
 def normalize_with_quantiles(arys, q_low=0.01, q_high=0.99):
+    """Clip and normalise a 2-D array column-wise to the range [-1, 1].
+
+    Values below the ``q_low`` quantile are clipped up; values above the
+    ``q_high`` quantile are clipped down. The remaining range is then linearly
+    mapped to [-1, 1].
+
+    Args:
+        arys: 2-D numpy array of shape (samples, features).
+        q_low: Lower quantile used as the clip floor (default 0.01).
+        q_high: Upper quantile used as the clip ceiling (default 0.99).
+
+    Returns:
+        numpy.ndarray of the same shape with values in [-1, 1].
+    """
     # 计算每列的 0.01 和 0.99 分位数
     min_vals = np.quantile(arys, q_low, axis=0, keepdims=True)
     max_vals = np.quantile(arys, q_high, axis=0, keepdims=True)
@@ -1243,6 +1288,16 @@ def normalize_with_quantiles(arys, q_low=0.01, q_high=0.99):
 
 
 def _normal_moving_average(ary, win_size=5):
+    """Compute a causal moving average, preserving the first win_size-1 elements unchanged.
+
+    Args:
+        ary: 1-D numpy array.
+        win_size: Window size for the convolution (default 5).
+
+    Returns:
+        numpy.ndarray of the same length; the first ``win_size - 1`` values are
+        copied directly from ``ary`` and the remainder are smoothed averages.
+    """
     avg = ary.copy()
     avg[win_size - 1 :] = np.convolve(ary, np.ones(win_size) / win_size, mode="valid")
     return avg
