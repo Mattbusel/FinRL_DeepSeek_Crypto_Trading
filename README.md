@@ -251,6 +251,18 @@ log aggregators (Datadog, CloudWatch, Splunk, etc.).
 
 ---
 
+## Metrics on Validation Set
+
+Run `python task1_eval.py` to populate these values after training.
+
+| Metric | Value |
+|--------|-------|
+| Sharpe Ratio | See training output |
+| Max Drawdown | See training output |
+| Annual Return | See training output |
+
+---
+
 ## Contact
 
 Author: Matthew C. Busel
