@@ -334,6 +334,73 @@ result = compare_vs_backtest(
 
 ---
 
+## Walk-Forward Backtesting
+
+Walk-forward analysis is the gold standard for evaluating trading strategies.
+It eliminates look-ahead bias by training a fresh agent on each rolling window
+and testing it immediately on the following out-of-sample period.
+
+```bash
+# Basic walk-forward backtest (60-bar train, 20-bar test, slides by 20 bars)
+python walk_forward.py --csv ./data/BTC_prices.csv --train 60 --test 20 --step 20
+
+# Longer windows for daily bars (6-month train, 1-month test)
+python walk_forward.py \
+  --csv ./data/BTC_daily.csv \
+  --train 180 --test 30 --step 30 \
+  --cash 50000 \
+  --commission 0.001 \
+  --plot equity_curve.png
+```
+
+Output:
+```
+Walk-Forward Summary
+==================================================
+  Folds:              10
+  Mean Sharpe:        0.832
+  Mean Return:        +3.41%
+  Mean Max Drawdown:  -7.21%
+  Mean Win Rate:      53.4%
+
+Per-Fold Results:
+  Fold   0 | train [    0,   60) | test [   60,   80) | sharpe= 1.234 | ret=+4.12% | ...
+  Fold   1 | train [   20,   80) | test [   80,  100) | sharpe= 0.756 | ret=+2.88% | ...
+```
+
+### Embedding walk-forward in your pipeline
+
+```python
+from walk_forward import WalkForwardEngine, WalkForwardConfig
+from erl_agent import AgentD3QN
+
+def make_rl_strategy():
+    """Factory that returns a fresh RL strategy for each fold."""
+    class RLStrategy:
+        def fit(self, train_prices):
+            # Train your DQN/D3QN agent here
+            pass
+        def predict(self, prices):
+            # Return signals from the trained agent
+            return agent.select_actions(prices)
+    return RLStrategy()
+
+config = WalkForwardConfig(
+    train_periods=180,
+    test_periods=30,
+    step=30,
+    min_folds=5,
+    seed=42,
+)
+
+engine = WalkForwardEngine(config=config, strategy_factory=make_rl_strategy)
+results = engine.run(df, price_col="close")
+print(results.summary())
+results.plot_equity_curve("rl_walk_forward.png")
+```
+
+---
+
 ## Testing Instructions
 
 Install test dependencies:
