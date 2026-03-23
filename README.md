@@ -24,6 +24,71 @@ Round 4 additions deliver an ensemble voting system for multi-model consensus an
 
 Round 5 additions introduce a live async WebSocket price feed adapter with Binance and Coinbase exchange support, and a strategy hyperparameter optimizer with exhaustive grid search and random search over configurable parameter distributions.
 
+Round 6 additions deliver a drift-based portfolio rebalancer with tracking-error metrics and a Brinson-Hood-Beebower performance attribution engine for crypto portfolios.
+
+---
+
+## Round 6 Features
+
+### Portfolio Rebalancer (`src/rebalancer.py`)
+
+Computes drift-based rebalancing trades and executes them via `PaperTrader`, tracking error before and after each rebalance cycle.
+
+| Class / Type | Role |
+|---|---|
+| `RebalanceConfig` | Configuration: `target_weights`, `threshold_pct`, `rebalance_frequency`, `max_trade_size_usd` |
+| `RebalanceTrade` | Single trade descriptor: symbol, current/target weight, direction, USD notional, estimated cost |
+| `RebalanceResult` | Summary: `trades_executed`, `total_cost_usd`, `tracking_error_before`, `tracking_error_after` |
+| `Rebalancer` | Core engine: `compute_trades(snapshot, prices)` and `execute(paper_trader, prices)` |
+
+Tracking error metric: `sqrt(sum((w_actual - w_target)^2))`.  Only positions whose absolute drift exceeds `threshold_pct` trigger a trade.  Each trade notional is independently capped at `max_trade_size_usd`.
+
+```python
+from src.rebalancer import Rebalancer, RebalanceConfig
+
+config = RebalanceConfig(
+    target_weights={"BTCUSDT": 0.5, "ETHUSDT": 0.3, "BNBUSDT": 0.2},
+    threshold_pct=0.05,
+    rebalance_frequency="daily",
+    max_trade_size_usd=10_000.0,
+)
+rebalancer = Rebalancer(config)
+trades = rebalancer.compute_trades({"BTCUSDT": 0.002}, {"BTCUSDT": 50_000.0})
+```
+
+### Performance Attribution (`src/attribution.py`)
+
+Brinson-Hood-Beebower (BHB) attribution decomposes active portfolio return into three orthogonal effects.
+
+| Class / Type | Role |
+|---|---|
+| `AttributionInput` | Inputs: `period`, `portfolio_weights`, `benchmark_weights`, `portfolio_returns`, `benchmark_returns` |
+| `AssetAttribution` | Per-asset components: `allocation`, `selection`, `interaction`, `total` |
+| `AttributionReport` | Aggregate report: portfolio-level effects, `total_active_return`, `by_asset` list |
+| `BhbAttribution` | Stateless engine: `compute(input) -> AttributionReport` |
+
+Formulas (per asset `i`):
+
+```
+allocation  = (w_p_i - w_b_i) * (r_b_i - R_b)
+selection   = w_b_i * (r_p_i - r_b_i)
+interaction = (w_p_i - w_b_i) * (r_p_i - r_b_i)
+```
+
+```python
+from src.attribution import AttributionInput, BhbAttribution
+
+inp = AttributionInput(
+    period="2024-Q1",
+    portfolio_weights={"BTC": 0.6, "ETH": 0.4},
+    benchmark_weights={"BTC": 0.5, "ETH": 0.5},
+    portfolio_returns={"BTC": 0.20, "ETH": 0.15},
+    benchmark_returns={"BTC": 0.18, "ETH": 0.12},
+)
+report = BhbAttribution().compute(inp)
+print(f"Active return: {report.total_active_return:.4f}")
+```
+
 ---
 
 ## Round 5 Features
