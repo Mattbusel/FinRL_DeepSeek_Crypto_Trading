@@ -22,6 +22,64 @@ Round 3 additions introduce a full paper trading simulator with position trackin
 
 Round 4 additions deliver an ensemble voting system for multi-model consensus and a backtest report generator with matplotlib charts or ASCII fallbacks.
 
+Round 5 additions introduce a live async WebSocket price feed adapter with Binance and Coinbase exchange support, and a strategy hyperparameter optimizer with exhaustive grid search and random search over configurable parameter distributions.
+
+---
+
+## Round 5 Features
+
+### Live Data Feed Adapter (`src/live_feed.py`)
+
+`LiveFeed` is an async WebSocket adapter for real-time crypto price feeds with automatic reconnection.
+
+| Class / Type | Role |
+|---|---|
+| `FeedConfig` | Configuration: `exchange`, `symbols`, `reconnect_delay`, `max_retries` |
+| `PriceTick` | Single price update: `symbol`, `price`, `volume`, `timestamp`, `bid`, `ask` |
+| `LiveFeed` | Abstract base with `connect()` async context manager and `stream()` async generator |
+| `BinanceFeed` | Adapter for `wss://stream.binance.com` combined `@bookTicker` streams |
+| `CoinbaseFeed` | Adapter for `wss://advanced-trade-ws.coinbase.com` ticker channel |
+| `FeedMultiplexer` | Fan-out: distributes ticks from one feed to multiple `asyncio.Queue` consumers |
+| `MockFeed` | Deterministic test double yielding a preset `list[PriceTick]` — no network needed |
+
+```python
+from src.live_feed import BinanceFeed, FeedConfig, FeedMultiplexer
+
+config = FeedConfig(exchange="binance", symbols=["btcusdt", "ethusdt"],
+                    reconnect_delay=2.0, max_retries=5)
+feed = BinanceFeed(config)
+
+async with feed.connect():
+    async for tick in feed.stream():
+        print(tick.symbol, tick.price, tick.spread())
+```
+
+### Strategy Optimizer (`src/strategy_optimizer.py`)
+
+Exhaustive grid search and random search over `StrategyParams` hyperparameter space.
+
+| Class / Type | Role |
+|---|---|
+| `StrategyParams` | Dataclass: `lookback`, `threshold`, `position_size`, `stop_loss_pct`, `take_profit_pct` |
+| `GridSearchOptimizer` | Exhaustive Cartesian product over discrete param grid |
+| `RandomSearchOptimizer` | Random sampling from `ParamDistribution` objects for `n_iter` trials |
+| `Uniform(low, high)` | Continuous uniform distribution |
+| `LogUniform(low, high)` | Log-scale uniform distribution |
+| `Choice(options)` | Discrete uniform selection |
+| `OptimizationResult` | `best_params`, `best_score`, `all_results`, `elapsed_s`; `.top_k(k)` helper |
+
+```python
+from src.strategy_optimizer import GridSearchOptimizer, StrategyParams
+
+def my_backtest(p: StrategyParams) -> dict:
+    return {"sharpe": p.lookback / 100.0 - p.threshold * 5}
+
+grid = {"lookback": [10, 20, 50], "threshold": [0.01, 0.02],
+        "position_size": [0.1], "stop_loss_pct": [0.05], "take_profit_pct": [0.15]}
+result = GridSearchOptimizer().search(grid, my_backtest, metric="sharpe")
+print(result.best_params, result.best_score)
+```
+
 ---
 
 ## Round 4 Features
