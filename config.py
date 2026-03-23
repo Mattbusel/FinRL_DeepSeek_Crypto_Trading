@@ -209,6 +209,79 @@ class LARSASettings(BaseSettings):
         description="Initial cash balance for evaluation episodes.",
     )
 
+    # --- Multi-asset portfolio ---
+    multi_asset_symbols: list[str] = Field(
+        default=["BTC", "ETH", "SOL"],
+        description=(
+            "Ordered list of crypto asset symbols for multi-asset portfolio mode. "
+            "Each symbol must have a corresponding price data file in data_dir."
+        ),
+    )
+    multi_asset_starting_cash: float = Field(
+        default=100_000.0,
+        gt=0.0,
+        description="Starting cash balance (USD) for multi-asset portfolio simulations.",
+    )
+    multi_asset_slippage: float = Field(
+        default=5e-4,
+        ge=0.0,
+        description="Per-trade slippage fraction for multi-asset rebalancing.",
+    )
+    multi_asset_correlation_window: int = Field(
+        default=120,
+        ge=2,
+        description="Rolling window length (steps) for the inter-asset correlation matrix.",
+    )
+    multi_asset_rebalance_threshold: float = Field(
+        default=0.02,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Minimum weight deviation (fraction) before a rebalancing trade is triggered. "
+            "Prevents excessive micro-trades on tiny portfolio drift."
+        ),
+    )
+    multi_asset_max_step: int = Field(
+        default=1800,
+        ge=1,
+        description="Maximum steps per episode in the multi-asset environment.",
+    )
+
+    # --- Paper trading ---
+    paper_trading_assets: list[str] = Field(
+        default=["BTCUSDT"],
+        description="Binance symbols to monitor in paper trading mode.",
+    )
+    paper_trading_cash: float = Field(
+        default=100_000.0,
+        gt=0.0,
+        description="Initial simulated cash balance for paper trading.",
+    )
+    paper_trading_slippage: float = Field(
+        default=5e-4,
+        ge=0.0,
+        description="Per-trade slippage fraction applied in paper trading.",
+    )
+    paper_trading_qty_fraction: float = Field(
+        default=0.05,
+        gt=0.0,
+        le=1.0,
+        description="Fraction of cash to deploy per buy signal in paper trading.",
+    )
+    paper_trading_poll_interval: float = Field(
+        default=60.0,
+        gt=0.0,
+        description="Seconds between live-price poll / decision cycles.",
+    )
+    paper_trading_db_path: str = Field(
+        default="./paper_trades.db",
+        description="SQLite database path for the paper trade log.",
+    )
+    paper_trading_ws_url: str = Field(
+        default="wss://stream.binance.com:9443/ws",
+        description="Binance WebSocket base URL for live price feeds.",
+    )
+
     # --- Paths ---
     data_dir: str = Field(
         default="./data",
