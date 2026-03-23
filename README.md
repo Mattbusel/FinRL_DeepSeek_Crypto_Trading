@@ -16,6 +16,144 @@
 
 LARSA (LLM-Augmented Regime-Switching Agent) is a hybrid reinforcement learning and large language model trading system for crypto assets. It extracts structured sentiment and risk signals from BTC news via the DeepSeek V3 API, mines predictive factors with a recurrent neural network trained on Alpha101 features, trains an ensemble of three DQN-family agents (D3QN, DoubleDQN, TwinD3QN) that vote on trade decisions, and dynamically shifts ensemble weights based on a detected market regime (bull, bear, sideways, volatile). The system supports single-asset BTC trading, multi-asset crypto portfolios, live paper trading on Binance price feeds, production-safe live trading via the Live Trading Bridge, per-trade explainability reports, and automated hyperparameter search.
 
+Round 2 additions extend LARSA with a multi-agent LLM debate layer, alternative data feeds, a continuous online learning pipeline, and advanced portfolio optimisation strategies — all integrated at the module level and fully tested.
+
+---
+
+## Round 2 Features
+
+### Multi-Agent Debate (`multi_agent_debate.py`)
+
+Three DeepSeek V3-powered agents with conflicting priors debate every trade over N configurable rounds before a Chief Arbiter synthesises a final verdict.
+
+| Class | Role |
+|---|---|
+| `BullAgent` | Argues exclusively for LONG positions; cites bullish catalysts |
+| `BearAgent` | Argues exclusively for SHORT positions; cites risks |
+| `NeutralAgent` | Moderates each round; identifies logical flaws; issues an impartial verdict |
+| `DeepSeekDebater` | Orchestrates the full debate loop via the DeepSeek V3 API |
+| `AgentDebate` | High-level facade with sane defaults |
+| `DebateVerdict` | Contains `final_action`, `consensus_confidence`, full `reasoning_chain`, and a `dissent` flag |
+
+```python
+from multi_agent_debate import AgentDebate
+
+debate = AgentDebate(n_rounds=2)
+verdict = debate.decide(
+    asset="BTC",
+    market_context="BTC broke $70k on high volume; RSI=72; on-chain accumulation rising.",
+)
+print(verdict.final_action)           # DebatePosition.LONG | SHORT | HOLD
+print(verdict.consensus_confidence)   # float 0–1
+print(verdict.summary())              # full reasoning chain
+```
+
+Each `DebateRound` carries `position_argued`, `evidence`, `counter_argument`, and `confidence`.
+The `dissent` flag is `True` when the neutral moderator's verdict differs from the Chief Arbiter's tie-break, surfacing disagreement for downstream risk management.
+
+---
+
+### Alternative Data Integration (`alt_data.py`)
+
+Four non-price data sources are assembled into a 12-feature normalised vector consumed by RL agents or portfolio optimisers. All sources use in-process TTL caching to avoid rate limiting.
+
+| Class | Source | Features |
+|---|---|---|
+| `FearGreedIndex` | alternative.me | 1 — normalised 0–1 |
+| `BitcoinOnChainMetrics` | blockchain.info `/stats` | 4 — active addresses, tx volume, miner revenue, hash rate (log-scaled) |
+| `SocialSentimentAggregator` | Reddit (live) + Twitter/Telegram (proxy) | 3 — per-channel + composite sentiment |
+| `MacroIndicatorFeed` | Yahoo Finance (yfinance) | 4 — DXY, gold, US 10Y yield, S&P 500 |
+| `AltDataBundle` | All of the above | 12-element `float32` feature vector |
+
+```python
+from alt_data import AltDataBundle
+
+bundle = AltDataBundle()
+vec = bundle.feature_vector()   # numpy float32 array, shape (12,)
+print(bundle.describe())        # human-readable summary of all signals
+```
+
+All sources degrade gracefully — if `blockchain.info` is down the on-chain features are zeroed rather than crashing the pipeline.
+
+---
+
+### Continuous Learning Pipeline (`continuous_learner.py`)
+
+Background async learning that adapts the DQN agent to live market conditions without blocking the trading loop.
+
+| Class | Purpose |
+|---|---|
+| `ExperienceReplay` | Thread-safe ring buffer (default 100 k transitions) |
+| `OnlineFinetuner` | Mini-batch Bellman updates on recent experience |
+| `ConceptDriftDetector` | ADWIN-style adaptive windowing; detects reward distribution shifts |
+| `ModelVersionManager` | Versioned checkpoint save/load; auto-prunes old files; `best` property by Sharpe |
+| `ContinuousLearner` | Orchestrator: runs all of the above in a daemon `threading.Thread` |
+
+```python
+from continuous_learner import ContinuousLearner
+
+learner = ContinuousLearner(agent=trained_agent, state_dim=32, action_dim=3)
+learner.start()
+
+# In the live trading loop:
+learner.record(state, action, reward, next_state, done=False)
+
+# On shutdown:
+learner.stop()
+```
+
+When `ConceptDriftDetector` fires:
+- The agent's `explore_rate` is boosted to `drift_explore_boost` (default 5%).
+- The fine-tuning interval shortens from `finetune_interval` to `finetune_interval_drift`.
+- Both gradually return to normal as the new regime stabilises.
+
+---
+
+### Portfolio Optimisation (`portfolio_opt.py`)
+
+Four allocation strategies share a common `allocate(returns)` interface and are wired into a single `PortfolioRebalancer` with transaction-cost awareness.
+
+| Class | Method |
+|---|---|
+| `MeanVarianceOptimizer` | Markowitz maximum-Sharpe with Ledoit-Wolf shrinkage; optional Black-Litterman view injection |
+| `HierarchicalRiskParity` | Ward-linkage dendrogram; recursive bisection of quasi-diagonalised covariance |
+| `MinimumCorrelation` | Minimises `w^T C w` (C = correlation matrix) via SLSQP |
+| `BlackLittermanViews` | Converts RL agent Q-value gaps into Bayesian prior views on expected returns |
+| `PortfolioRebalancer` | Periodic rebalancing; skips if drift < threshold or cost > max; strategy hot-swap |
+
+```python
+import numpy as np
+from portfolio_opt import (
+    HierarchicalRiskParity,
+    BlackLittermanViews,
+    PortfolioRebalancer,
+    OptimStrategy,
+)
+
+returns = np.random.randn(120, 3).astype(np.float32) * 0.02
+
+# Standalone HRP allocation
+hrp = HierarchicalRiskParity(assets=["BTC", "ETH", "SOL"])
+weights = hrp.allocate(returns)
+print(weights)  # e.g. [0.45, 0.33, 0.22], sums to 1.0
+
+# Rebalancer with Black-Litterman views from RL Q-values
+bl = BlackLittermanViews(assets=["BTC", "ETH", "SOL"])
+rebalancer = PortfolioRebalancer(
+    assets=["BTC", "ETH", "SOL"],
+    strategy=OptimStrategy.MEAN_VARIANCE,
+    drift_threshold=0.05,         # rebalance when weights drift >5%
+    transaction_cost_bps=10.0,    # 10 bps round-trip cost
+    bl=bl,
+)
+q_long  = np.array([0.8, 0.5, 0.3])
+q_short = np.array([0.2, 0.5, 0.7])
+views = bl.from_q_values(q_long, q_short)
+record = rebalancer.rebalance(returns, bl_views=views)
+if record:
+    print(rebalancer.summary())
+```
+
 ---
 
 ## Architecture Diagram
@@ -637,12 +775,16 @@ regime_detector.py          Market regime detection (bull/bear/sideways/volatile
 live_trading_bridge.py      Production-safe exchange bridge with full risk gates
 explainability.py           SHAP attribution + per-trade HTML/JSON reports (LarsaExplainer)
 hyperparameter_search.py    Grid/random search over LARSA hyperparameters
+multi_agent_debate.py       BullAgent/BearAgent/NeutralAgent LLM debate + DebateVerdict
+alt_data.py                 Fear&Greed, on-chain, social sentiment, macro + AltDataBundle
+continuous_learner.py       ExperienceReplay, OnlineFinetuner, ADWIN drift, ModelVersionManager
+portfolio_opt.py            MeanVariance, HRP, MinCorr, Black-Litterman, PortfolioRebalancer
 config.py                   Pydantic settings (all hyperparameters)
 exceptions.py               Custom exception hierarchy (LARSAError)
 logger.py                   Structured JSON logging setup
 metrics.py                  Sharpe, max drawdown, RoMaD helpers
 data_config.py              Data path configuration
-tests/                      Pytest test suite (21+ test files)
+tests/                      Pytest test suite (25+ test files)
 requirements.txt            Pinned dependencies
 pyproject.toml              Package metadata, ruff, mypy, pytest config
 .github/workflows/ci.yml    CI: lint, type-check, test with coverage
@@ -678,6 +820,90 @@ Run `python task1_eval.py` to populate these values after training.
 | RoMaD | See training output | See training output |
 
 Paper trading results are logged to SQLite and displayed via `print_dashboard()`.
+
+---
+
+## Round 2 Features
+
+### Meta-Learning Agent (`src/meta_agent.py`)
+
+A higher-level controller that observes the ensemble's rolling prediction accuracy
+over three time horizons and adaptively scales position sizes:
+
+| Regime | Trigger | Position Multiplier |
+|---|---|---|
+| **UNCERTAINTY** | accuracy (1h/4h/24h) < 45 % | **0.25×** (reduce exposure) |
+| **NORMAL** | accuracy between thresholds | **1.00×** (baseline) |
+| **CONFIDENCE** | accuracy (1h/4h/24h) > 60 % | **1.50×** (increase exposure) |
+
+Regime is determined by majority vote across three rolling windows (1 h, 4 h, 24 h).
+All transitions are recorded in `RegimeTransitionLog` for post-hoc analysis.
+
+```python
+from src.meta_agent import MetaAgent, MetaRegime
+
+agent = MetaAgent(bars_per_hour=60)    # 1-minute bars
+
+# After each bar's return is known:
+state, multiplier = agent.observe_and_decide(
+    predicted_action=1,          # ensemble's action
+    realised_return=0.003,       # bar's actual return
+)
+final_position_size = base_size * multiplier
+
+# Export all regime transitions:
+df = agent.transition_log.as_dataframe()
+df.to_csv("regime_transitions.csv", index=False)
+```
+
+Key types:
+- `MetaState { accuracy_1h, accuracy_4h, accuracy_24h, regime, position_multiplier }`
+- `RegimeTransition { from_regime, to_regime, timestamp, accuracy_1h, accuracy_4h, accuracy_24h, bar_index }`
+- `RegimeTransitionLog` — deque of transitions with pandas export
+
+---
+
+### Feature Importance Dashboard (`src/feature_dashboard.py`)
+
+SHAP-based explainability for the RNN feature extractor.  Breaks feature
+contributions into three buckets and renders a formatted terminal table plus
+an optional Matplotlib bar chart.
+
+```bash
+# Auto-discover latest checkpoint, show top 15 features:
+python src/feature_dashboard.py --checkpoint latest
+
+# Show top 20 features, skip chart:
+python src/feature_dashboard.py --checkpoint latest --top 20 --no-plot
+
+# Output JSON report instead of text:
+python src/feature_dashboard.py --checkpoint latest --json
+
+# Save chart to PNG:
+python src/feature_dashboard.py --checkpoint latest --save-chart importance.png
+```
+
+Sample output:
+
+```
+======================================================================
+  LARSA Feature Importance Dashboard  —  model: larsa_rnn
+  n_samples=200   Technical=62.4%   Sentiment=28.1%   Macro=9.5%
+======================================================================
+  Rank  Feature                              |SHAP|  Dir        Category
+----------------------------------------------------------------------
+  1     alpha_012                           0.04821  BULL        technical
+  2     sentiment_score                     0.03944  BULL        sentiment
+  3     alpha_001                           0.03211  BEAR        technical
+  4     risk_score                          0.02877  BEAR        sentiment
+  ...
+======================================================================
+```
+
+Key types:
+- `FeatureImportance { feature_name, shap_value, direction, rank, category }`
+- `FeatureReport { top_features, sentiment_weight, technical_weight, macro_weight, n_samples }`
+- `FeatureImportanceAnalyzer` — wraps `shap.GradientExplainer` (PyTorch) or `KernelExplainer` fallback
 
 ---
 
