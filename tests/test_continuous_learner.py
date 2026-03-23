@@ -48,9 +48,14 @@ def _fill_replay(
 
 
 def _mock_agent(state_dim: int = 8, action_dim: int = 3):
-    """Create a minimal mock agent with act, act_optimizer attributes."""
-    import torch
-    import torch.nn as nn
+    """Create a minimal mock agent with act, act_optimizer attributes.
+
+    Returns a plain MagicMock when torch is unavailable so non-torch tests
+    can still run; tests that actually need a real network call
+    pytest.importorskip("torch") themselves.
+    """
+    torch = pytest.importorskip("torch")
+    nn = torch.nn
 
     net = nn.Linear(state_dim, action_dim)
     optimizer = torch.optim.Adam(net.parameters(), lr=1e-3)
@@ -237,6 +242,7 @@ class TestModelVersionManager:
             assert best.sharpe == pytest.approx(1.8)
 
     def test_load_raises_when_no_checkpoints(self):
+        pytest.importorskip("torch")
         agent = _mock_agent()
         with tempfile.TemporaryDirectory() as tmpdir:
             mgr = ModelVersionManager(checkpoint_dir=tmpdir)
@@ -337,6 +343,7 @@ class TestContinuousLearner:
             assert not learner.is_running
 
     def test_record_fills_buffer(self):
+        pytest.importorskip("torch")
         agent = _mock_agent()
         with tempfile.TemporaryDirectory() as tmpdir:
             learner = ContinuousLearner(
@@ -352,6 +359,7 @@ class TestContinuousLearner:
             assert len(learner.replay) == 20
 
     def test_double_start_raises(self):
+        pytest.importorskip("torch")
         agent = _mock_agent()
         with tempfile.TemporaryDirectory() as tmpdir:
             learner = ContinuousLearner(
@@ -369,6 +377,7 @@ class TestContinuousLearner:
                 learner.stop(timeout=2.0)
 
     def test_drift_boosts_explore_rate(self):
+        pytest.importorskip("torch")
         agent = _mock_agent()
         agent.explore_rate = 0.001
 
