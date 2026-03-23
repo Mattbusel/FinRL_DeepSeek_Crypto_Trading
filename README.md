@@ -26,6 +26,8 @@ Round 5 additions introduce a live async WebSocket price feed adapter with Binan
 
 Round 6 additions deliver a drift-based portfolio rebalancer with tracking-error metrics and a Brinson-Hood-Beebower performance attribution engine for crypto portfolios.
 
+Round 7 additions introduce a Walk-Forward Validator for overfitting-resistant strategy evaluation using expanding-window splits, and a Crypto Correlation Tracker that maintains rolling Pearson correlation matrices across dynamic asset sets with diversification scoring.
+
 ---
 
 ## Round 6 Features
