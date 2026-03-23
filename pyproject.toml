@@ -29,6 +29,9 @@ dependencies = [
     "scipy>=1.10.1",
     "torch>=2.4.1",
     "typing-extensions>=4.12.2",
+    "alpaca-py>=0.18.0",
+    "hmmlearn>=0.3.0",
+    "shap>=0.45.0",
 ]
 
 [project.optional-dependencies]

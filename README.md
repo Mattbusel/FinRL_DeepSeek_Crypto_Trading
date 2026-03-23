@@ -114,6 +114,137 @@ DEEPSEEK_API_KEY=your-key-here
 
 ---
 
+## Live Paper Trading (Alpaca Integration)
+
+`paper_trader.py` connects the LARSA ensemble to [Alpaca's paper trading API](https://alpaca.markets/),
+enabling live testing of strategies without real capital.
+
+### Setup
+
+```bash
+export ALPACA_API_KEY="your-alpaca-key"
+export ALPACA_SECRET_KEY="your-alpaca-secret"
+# Optional — defaults to paper trading endpoint:
+export ALPACA_BASE_URL="https://paper-api.alpaca.markets"
+```
+
+Install the Alpaca client:
+
+```bash
+pip install alpaca-py
+```
+
+### Usage
+
+```python
+from paper_trader import AlpacaPaperTrader, PaperTradingLoop, PaperTradingConfig
+
+# Connect
+trader = AlpacaPaperTrader()          # reads env vars automatically
+trader.connect()
+
+# Single order
+result = trader.place_order("BTCUSD", qty=0.001, side="buy")
+print(result.order_id, result.status)
+
+# Dry-run mode — logs everything but never calls Alpaca
+dry_trader = AlpacaPaperTrader(dry_run=True)
+dry_trader.connect()
+
+# Full paper trading loop with ensemble agents
+config = PaperTradingConfig(symbol="BTCUSD", trade_qty=0.001, poll_interval_seconds=60)
+loop = PaperTradingLoop(trader=dry_trader, agents=my_agents, config=config)
+loop.run(state_provider=lambda: current_state)
+```
+
+Key safeguards:
+- **Position size limit**: Each buy order is capped at 10 % of portfolio equity.
+- **Dry-run mode**: Set `dry_run=True` to log intended orders without sending them.
+
+---
+
+## HMM Regime Detection
+
+`regime_detector.py` uses a 4-state Gaussian Hidden Markov Model (via
+[hmmlearn](https://hmmlearn.readthedocs.io/)) to classify the current market
+into one of four regimes and adjusts ensemble voting weights accordingly.
+
+### Regimes
+
+| Regime | Description | D3QN weight |
+|---|---|---|
+| `BULL` | Upward trend, moderate volatility | Increased (aggressive) |
+| `BEAR` | Downward trend | Conservative agents increased |
+| `SIDEWAYS` | Low-directional drift | Balanced |
+| `HIGH_VOLATILITY` | Extreme intraday moves | All weights and position sizes halved |
+
+### Setup
+
+```bash
+pip install hmmlearn
+```
+
+### Usage
+
+```python
+from regime_detector import HMMRegimeDetector, RegimeAwareEnsemble
+
+# Train on historical prices
+detector = HMMRegimeDetector()
+detector.fit(train_prices)
+
+# Predict current regime
+regime = detector.predict(recent_prices[-60:])
+print(regime)  # MarketRegime.BULL
+
+# Adaptive ensemble weights
+ensemble = RegimeAwareEnsemble(detector=detector, position_size_base=0.001)
+weights, size = ensemble.get_weights_and_size(recent_prices[-60:])
+```
+
+---
+
+## SHAP Explainability
+
+`explainability.py` wraps any LARSA DRL agent with SHAP-based attribution to
+produce human-readable explanations for each trade decision.
+
+### Setup
+
+```bash
+pip install shap
+```
+
+### Usage
+
+```python
+from explainability import TradeExplainer
+
+feature_names = ["position", "btc_price", "signal_0", ...]  # 12 features
+explainer = TradeExplainer(agent=my_agent, feature_names=feature_names, symbol="BTCUSD")
+
+report = explainer.explain_decision(state=current_state, action=1)
+print(report.to_text())
+```
+
+Example output:
+
+```
+Traded BUY BTCUSD because:
+  sentiment_score           +0.3400  (bullish)
+  momentum                  +0.2100  (bullish)
+  volatility                -0.1500  (bearish)
+  btc_price                 +0.0800  (bullish)
+  signal_3                  -0.0400  (bearish)
+  [baseline Q=0.1234, predicted Q=0.9876]
+```
+
+Attribution methods:
+- **Gradient** (default): input × dQ/d(input) via `torch.autograd.grad`.
+- **KernelSHAP** (fallback): model-agnostic attribution via the `shap` library.
+
+---
+
 ## Configuration Reference
 
 All settings are read from environment variables (or a `.env` file) and
@@ -121,6 +252,9 @@ validated at startup via `config.py`. Defaults are shown below.
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
+| `ALPACA_API_KEY` | For live paper trading | (none) | Alpaca paper trading API key |
+| `ALPACA_SECRET_KEY` | For live paper trading | (none) | Alpaca paper trading secret key |
+| `ALPACA_BASE_URL` | No | `https://paper-api.alpaca.markets` | Alpaca endpoint URL |
 | `DEEPSEEK_API_KEY` | Yes | (none) | API key for the DeepSeek inference endpoint |
 | `DEEPSEEK_BASE_URL` | No | `https://api.deepseek.com/v1` | Endpoint URL |
 | `DEEPSEEK_MODEL` | No | `deepseek-chat` | Model identifier |
@@ -212,6 +346,9 @@ pytest tests/test_config.py tests/test_exceptions.py tests/test_logger.py \
 
 ```
 deepseek_signals.py       DeepSeek V3 API signal extractor
+paper_trader.py           Alpaca paper trading integration (new)
+regime_detector.py        HMM market regime detection (new)
+explainability.py         SHAP trade explainability layer (new)
 seq_net.py                RnnRegNet and NnSeqBnMLP definitions
 seq_run.py                Trains the RNN on factor + signal data
 erl_agent.py              DQN-family agent implementations
@@ -227,7 +364,7 @@ exceptions.py             Custom exception hierarchy (LARSAError)
 logger.py                 Structured JSON logging setup
 metrics.py                Sharpe, max drawdown, RoMaD helpers
 data_config.py            Data path configuration
-tests/                    Pytest test suite (21+ test files)
+tests/                    Pytest test suite (25+ test files)
 requirements.txt          Pinned dependencies
 pyproject.toml            Package metadata, ruff, mypy, pytest config
 .github/workflows/ci.yml  CI: lint, type-check, test with coverage

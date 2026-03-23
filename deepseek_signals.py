@@ -231,11 +231,12 @@ def analyze_article_sentiment(title: str, text: str) -> dict[str, Any] | None:
     confidence: float = float(data.get("confidence_score_sentiment", 0))
     if confidence < settings.min_confidence_threshold:
         log.warning(
-            "sentiment.low_confidence",
+            "sentiment.low_confidence.discarded",
             confidence=round(confidence, 3),
             threshold=settings.min_confidence_threshold,
             title=title[:60],
         )
+        return None
     return data
 
 
@@ -274,11 +275,12 @@ def analyze_article_risk(title: str, text: str) -> dict[str, Any] | None:
     confidence: float = float(data.get("confidence_score_risk", 0))
     if confidence < settings.min_confidence_threshold:
         log.warning(
-            "risk.low_confidence",
+            "risk.low_confidence.discarded",
             confidence=round(confidence, 3),
             threshold=settings.min_confidence_threshold,
             title=title[:60],
         )
+        return None
     return data
 
 

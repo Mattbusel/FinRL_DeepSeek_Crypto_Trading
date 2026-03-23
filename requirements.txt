@@ -40,6 +40,22 @@ sympy==1.13.3
 typing_extensions==4.12.2
 tzdata==2024.2
 
+# Alpaca paper trading (use one of the two lines below)
+alpaca-py>=0.18.0
+# alpaca-trade-api>=3.0.2  # legacy alternative
+
+# HMM regime detection
+hmmlearn>=0.3.0
+
+# SHAP explainability
+shap>=0.45.0
+
+# Dashboard
+streamlit>=1.32.0
+
+# YAML configuration
+pyyaml>=6.0
+
 # Dev / test
 pytest>=8.0
 pytest-cov>=4.1
