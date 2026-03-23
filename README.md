@@ -18,6 +18,97 @@ LARSA (LLM-Augmented Regime-Switching Agent) is a hybrid reinforcement learning 
 
 Round 2 additions extend LARSA with a multi-agent LLM debate layer, alternative data feeds, a continuous online learning pipeline, and advanced portfolio optimisation strategies — all integrated at the module level and fully tested.
 
+Round 3 additions introduce a full paper trading simulator with position tracking and PnL accounting, and a configurable risk-limits engine with hard stops and soft reductions.
+
+---
+
+## Round 3 Features
+
+### Paper Trading Simulator (`src/paper_trader.py`)
+
+`PaperTrader` tracks virtual positions, cash balance, and PnL in real time without touching any exchange API. It mirrors exchange mechanics including commission deduction, position averaging, short selling, and max-drawdown watermarking.
+
+| Class / Type | Role |
+|---|---|
+| `PaperTrader` | Central account; `buy`, `sell`, `close_all`, `mark_to_market`, `snapshot` |
+| `Position` | Open position: symbol, side, entry price, quantity, unrealized/realized PnL |
+| `TradeResult` | Execution record: price, quantity, commission, status, realized PnL |
+| `PortfolioSnapshot` | Point-in-time: balance, total equity, open positions, daily PnL, max drawdown |
+| `TradeSide` | `LONG` / `SHORT` |
+| `TradeStatus` | `FILLED` / `REJECTED` / `PARTIAL` |
+
+```python
+from src.paper_trader import PaperTrader
+
+trader = PaperTrader(initial_balance=10_000.0, commission_rate=0.001)
+
+# Open a long position
+result = trader.buy("BTCUSDT", price=30_000.0, quantity=0.1)
+print(result.status)         # TradeStatus.FILLED
+print(result.commission)     # 3.0 USDT
+
+# Update unrealized PnL
+trader.mark_to_market({"BTCUSDT": 31_000.0})
+print(trader.positions["BTCUSDT"].unrealized_pnl)  # 100.0
+
+# Portfolio snapshot
+snap = trader.snapshot({"BTCUSDT": 31_000.0})
+print(snap.total_equity)     # ~10_097.0
+print(snap.max_drawdown)     # 0.0 (no drawdown yet)
+
+# Close everything
+results = trader.close_all({"BTCUSDT": 31_000.0})
+```
+
+Max-drawdown is computed via a peak-equity watermark and updated on every `buy`, `sell`, and `mark_to_market` call. `PaperTrader.history` is a flat list of all `TradeResult` objects for replay and analysis.
+
+---
+
+### Risk Limits Engine (`src/risk_limits.py`)
+
+`RiskLimits` wraps any trade action and evaluates it against five configurable hard stops. Decisions are `Allow`, `Reject` (hard stop), or `Reduce` (scale down the order size).
+
+| Check | Trigger |
+|---|---|
+| Daily loss budget | `daily_pnl < -max_daily_loss_usd` → Reject |
+| Drawdown circuit breaker | `max_drawdown >= max_drawdown_pct` → Reject |
+| Leverage limit | gross notional / cash >= `max_leverage` → Reject |
+| Approaching leverage | 80 % of `max_leverage` → Reduce |
+| Position concentration | single position > `max_position_pct` of equity → Reduce |
+| Position size budget | balance < `position_size_usd` → Reduce |
+
+```python
+from src.risk_limits import RiskLimits, LimitConfig, DecisionKind
+from src.paper_trader import PaperTrader
+
+config = LimitConfig(
+    max_position_pct=0.20,       # no single position > 20 % of equity
+    max_daily_loss_usd=500.0,    # block all trades after $500 daily loss
+    max_drawdown_pct=0.10,       # circuit breaker at 10 % drawdown
+    max_leverage=3.0,            # max 3x gross exposure
+    position_size_usd=1_000.0,   # target single-trade notional
+)
+limits = RiskLimits(config)
+trader = PaperTrader(10_000.0)
+
+snap = trader.snapshot()
+decision = limits.check("buy", snap)
+
+if decision.kind == DecisionKind.ALLOW:
+    trader.buy("BTCUSDT", 30_000.0, 0.033)
+elif decision.kind == DecisionKind.REDUCE:
+    qty = 0.033 * decision.scale_factor
+    trader.buy("BTCUSDT", 30_000.0, qty)
+else:
+    print("Trade blocked:", decision.reason)
+
+report = limits.report()
+print(report.checks_run)                        # 1
+print(report.current_utilization["drawdown"])   # 0.0
+```
+
+`RiskLimits.report()` returns a `RiskReport` with cumulative check statistics and current utilization fractions (0–1) for each limit, enabling dashboards and alerting.
+
 ---
 
 ## Round 2 Features
