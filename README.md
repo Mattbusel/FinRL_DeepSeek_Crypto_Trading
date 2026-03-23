@@ -20,6 +20,69 @@ Round 2 additions extend LARSA with a multi-agent LLM debate layer, alternative 
 
 Round 3 additions introduce a full paper trading simulator with position tracking and PnL accounting, and a configurable risk-limits engine with hard stops and soft reductions.
 
+Round 4 additions deliver an ensemble voting system for multi-model consensus and a backtest report generator with matplotlib charts or ASCII fallbacks.
+
+---
+
+## Round 4 Features
+
+### Ensemble Voting System (`src/ensemble.py`)
+
+`EnsembleVoter` aggregates trade predictions from multiple models (-1 sell / 0 hold / 1 buy) into a single consensus decision using four configurable strategies.
+
+| Class / Type | Role |
+|---|---|
+| `ModelPrediction` | One model's prediction: `model_id`, `action`, `confidence`, `timestamp` |
+| `EnsembleDecision` | Consensus output: `action`, `confidence`, `agreement_rate`, `dissenting_models` |
+| `VotingStrategy` | `MAJORITY`, `WEIGHTED_MAJORITY`, `SOFT_VOTING`, `CONFIDENCE_THRESHOLD` |
+| `ConfidenceThreshold` | Parameterised threshold variant: filters predictions below `min_conf` |
+| `EnsembleVoter` | Core voter: `add_model`, `remove_model`, `vote(predictions)` |
+
+```python
+from src.ensemble import EnsembleVoter, ModelPrediction, VotingStrategy
+
+voter = EnsembleVoter(strategy=VotingStrategy.WEIGHTED_MAJORITY)
+voter.add_model("d3qn",     weight=1.5)
+voter.add_model("double_dqn", weight=1.0)
+voter.add_model("twin_d3qn",  weight=0.8)
+
+predictions = [
+    ModelPrediction(model_id="d3qn",      action=1,  confidence=0.82, timestamp=0.0),
+    ModelPrediction(model_id="double_dqn", action=1,  confidence=0.65, timestamp=0.0),
+    ModelPrediction(model_id="twin_d3qn",  action=-1, confidence=0.55, timestamp=0.0),
+]
+
+decision = voter.vote(predictions)
+print(decision.action)             # 1 (buy)
+print(decision.agreement_rate)     # 0.667
+print(decision.dissenting_models)  # ["twin_d3qn"]
+```
+
+### Backtest Report Generator (`src/report_generator.py`)
+
+`BacktestReport` produces a self-contained dark-themed HTML report from a trade log and equity curve.  Uses matplotlib for chart images; falls back to 80-column ASCII block charts when matplotlib is unavailable.
+
+| Class / Type | Role |
+|---|---|
+| `PerformanceMetrics` | Dataclass: total/annualised return, Sharpe, Sortino, max drawdown, Calmar, win rate, profit factor, avg PnL |
+| `BacktestReport` | `generate(trades, equity_curve, output_path) -> str` |
+
+```python
+from src.report_generator import BacktestReport
+
+report = BacktestReport(use_matplotlib=True)
+html = report.generate(
+    trades=[
+        {"symbol": "BTC", "side": "long", "entry_date": "2024-01-01",
+         "exit_date": "2024-01-05", "entry_price": 42000.0,
+         "exit_price": 43000.0, "pnl": 1000.0},
+    ],
+    equity_curve=[10000.0, 10200.0, 10500.0, 10800.0, 11000.0],
+    output_path="report.html",
+)
+print(report.compute_metrics(trades, equity_curve).sharpe_ratio)
+```
+
 ---
 
 ## Round 3 Features
