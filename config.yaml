@@ -1,0 +1,71 @@
+# LARSA system configuration
+# All values here serve as defaults.  Override any setting by exporting the
+# corresponding upper-cased environment variable (e.g. DEEPSEEK_API_KEY).
+# Load this file in Python with:
+#
+#   from config_yaml import load_config
+#   cfg = load_config()
+
+# ── DeepSeek API ──────────────────────────────────────────────────────────
+deepseek_api_key: ""                     # export DEEPSEEK_API_KEY="sk-..."
+deepseek_base_url: "https://api.deepseek.com/v1"
+deepseek_model: "deepseek-chat"
+deepseek_temperature: 0.0
+deepseek_max_tokens: 300
+
+# ── Signal extraction ─────────────────────────────────────────────────────
+max_retries: 5
+retry_backoff_seconds: [1.0, 2.0, 4.0, 8.0, 16.0]
+checkpoint_interval: 10
+min_confidence_threshold: 0.3
+
+# ── RNN sequence model ────────────────────────────────────────────────────
+rnn_batch_size: 256
+rnn_mid_dim: 128
+rnn_num_layers: 4
+rnn_epochs: 256
+rnn_warmup_dim: 64
+rnn_valid_gap: 128
+rnn_num_patience: 8
+rnn_weight_decay: 0.0001
+rnn_learning_rate: 0.001
+rnn_clip_grad_norm: 2.0
+rnn_train_ratio: 0.6
+
+# ── RL agent ──────────────────────────────────────────────────────────────
+rl_learning_rate: 0.000002
+rl_batch_size: 512
+rl_gamma: 0.995
+rl_explore_rate: 0.005
+rl_soft_update_tau: 0.000002
+rl_state_value_tau: 0.01
+rl_net_dims: [128, 128, 128]
+rl_break_step: 32
+
+# ── Trade simulation ──────────────────────────────────────────────────────
+num_sims: 4096
+num_ignore_step: 60
+max_position: 1
+step_gap: 2
+slippage: 0.0000007
+starting_cash: 1000000.0
+
+# ── Paper trading ─────────────────────────────────────────────────────────
+paper_trade_starting_cash: 100000.0
+paper_trade_interval_seconds: 10.0
+paper_trade_slippage: 0.0005
+paper_trade_trade_fraction: 0.10
+paper_trade_short_window: 5
+paper_trade_long_window: 20
+paper_trade_log_file: "paper_trades.jsonl"
+
+# ── Backtesting ───────────────────────────────────────────────────────────
+backtest_slippage: 0.0005
+backtest_trade_fraction: 0.10
+backtest_short_window: 5
+backtest_long_window: 20
+
+# ── Paths ─────────────────────────────────────────────────────────────────
+data_dir: "./data"
+output_dir: "./output"
+log_level: "INFO"
