@@ -1,4 +1,37 @@
-"""SHAP-based explainability layer for LARSA DRL trading decisions.
+"""SHAP-based explainability and LARSA signal dashboard for trading decisions.
+
+This module provides two complementary explainability systems:
+
+1. :class:`TradeExplainer` -- SHAP-based attribution for individual DRL agent
+   decisions (gradient or KernelSHAP).
+
+2. :class:`LarsaExplainer` -- High-level per-signal explanation that combines
+   DeepSeek sentiment drivers, Alpha101 factor contributions, ensemble votes,
+   and regime context into an HTML report and JSON audit trail.
+
+Example (LarsaExplainer)::
+
+    from explainability import LarsaExplainer
+
+    explainer = LarsaExplainer()
+    explanation = explainer.explain_signal(
+        signal_data={"direction": "buy", "confidence": 0.82, "regime": "bull"},
+        news_items=["BTC ETF approved", "Fed pauses rate hikes"],
+        factor_values={"alpha_001": 0.45, "alpha_012": -0.12},
+        agent_outputs=[
+            {"agent_type": "D3QN", "agent_id": 0, "action": "buy", "q_value": 1.23},
+            {"agent_type": "DDQN", "agent_id": 1, "action": "buy", "q_value": 0.98},
+            {"agent_type": "TwinD3QN", "agent_id": 2, "action": "hold", "q_value": 0.55},
+        ],
+    )
+    html = explainer.generate_html_report(explanation)
+    with open("trade_report.html", "w") as f:
+        f.write(html)
+
+    audit = explainer.generate_json_audit(explanation)
+    with open("audit.jsonl", "a") as f:
+        f.write(audit + "\\n")
+"""
 
 Wraps any LARSA DRL agent with SHAP analysis to surface the top features
 driving each trade decision.  Supports both gradient-based explanations
