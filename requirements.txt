@@ -5,8 +5,7 @@ scipy==1.10.1
 torch==2.4.1
 matplotlib==3.10.1
 
-# Financial metrics
-empyrical==0.5.5
+# Financial metrics are implemented in metrics.py (numpy only)
 
 # DeepSeek / OpenAI-compatible client
 openai>=1.0

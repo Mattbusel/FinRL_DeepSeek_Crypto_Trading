@@ -9,6 +9,27 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- `scripts/prepare_data.py`: downloads the public contest data, merges optional
+  DeepSeek news signals, writes a time-ordered 70/30 train/test split.
+- `scripts/replay_test.py`: deterministic replay of an ensemble over the whole
+  test split with per-step logs and a summary.
+- README rebuilt around a reproducible CPU run; hero, pipeline diagram,
+  terminal capture and results chart in `assets/`; social preview card.
+
+### Fixed
+- `trade_simulator.py` crashed on pandas 3 (read-only arrays).
+- `logger.py` rejected stdlib `%`-style arguments and structured fields named
+  like LogRecord attributes (`name`), which crashed the simulator and training.
+- `erl_agent.py` saved checkpoints that it could not load back with
+  `weights_only=True`; it now saves state_dicts and still reads the legacy
+  pickled networks.
+- `task1_eval.py` priced trades at the start of the dataset instead of the
+  episode, and loaded agents from a directory training never wrote.
+- `task1_ensemble.py` trained two DoubleDQNs into the same checkpoint dir.
+- `explainability.py` had a syntax error (merged module docstrings).
+- `metrics.py` no longer depends on the unmaintained `empyrical`.
+
 ---
 
 ## [1.1.0] - 2026-03-17

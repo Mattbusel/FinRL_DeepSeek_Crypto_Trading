@@ -177,6 +177,7 @@ class Ensemble:
         for agent_class in self.agent_classes:
             log.info("agent.train.start", name=agent_class.__name__)
             args.agent_class = agent_class
+            args.cwd = None  # one scratch dir per agent class, not one shared dir
             agent = self.train_agent(args=args)
             self.agents.append(agent)
             log.info("agent.train.done", name=agent_class.__name__)
@@ -408,5 +409,7 @@ def run(
 if __name__ == "__main__":
     run(
         "ensemble_teamname",
-        [AgentD3QN, AgentDoubleDQN, AgentDoubleDQN, AgentTwinD3QN],
+        # One agent per class: checkpoints are saved per class name, so a
+        # repeated class would silently overwrite the earlier one.
+        [AgentD3QN, AgentDoubleDQN, AgentTwinD3QN],
     )

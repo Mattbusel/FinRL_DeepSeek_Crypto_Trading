@@ -11,7 +11,6 @@ Example::
 
 from __future__ import annotations
 
-import empyrical as ep
 import numpy as np
 import pandas as pd
 
@@ -34,7 +33,9 @@ def cumulative_returns(returns_pct: np.ndarray | list[float]) -> pd.Series:
     arr = np.asarray(returns_pct, dtype=float)
     if arr.size == 0:
         raise SignalError("cumulative_returns received an empty returns array.")
-    return ep.cum_returns(arr)
+    # Same convention as empyrical.cum_returns: NaN steps count as flat.
+    wealth = np.cumprod(1.0 + np.nan_to_num(arr, nan=0.0))
+    return pd.Series(wealth - 1.0)
 
 
 def sharpe_ratio(returns_pct: np.ndarray | list[float], risk_free: float = 0.0) -> float:
@@ -56,8 +57,11 @@ def sharpe_ratio(returns_pct: np.ndarray | list[float], risk_free: float = 0.0) 
     arr = np.asarray(returns_pct, dtype=float)
     if arr.size == 0:
         raise SignalError("sharpe_ratio received an empty returns array.")
+    if arr.size < 2:
+        return float(np.inf)
     std = float(arr.std(ddof=1))
-    if std == 0.0:
+    # Treat float round-off (identical returns) as zero dispersion.
+    if std <= 1e-12 * max(1.0, float(np.abs(arr).max())):
         return float(np.inf)
     return float((arr.mean() - risk_free) / std)
 
@@ -77,7 +81,10 @@ def max_drawdown(returns_pct: np.ndarray | list[float]) -> float:
     arr = np.asarray(returns_pct, dtype=float)
     if arr.size == 0:
         raise SignalError("max_drawdown received an empty returns array.")
-    return float(ep.max_drawdown(arr))
+    # Wealth path starting at 1.0 before the first return, as empyrical does.
+    wealth = np.concatenate(([1.0], np.cumprod(1.0 + np.nan_to_num(arr, nan=0.0))))
+    peak = np.maximum.accumulate(wealth)
+    return float(np.min((wealth - peak) / peak))
 
 
 def return_over_max_drawdown(returns_pct: np.ndarray | list[float]) -> float:

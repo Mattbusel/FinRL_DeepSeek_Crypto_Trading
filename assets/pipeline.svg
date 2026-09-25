@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 470" width="1200" height="470" font-family="ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace">
+  <title>LARSA pipeline: order book and news become a 12-number state, three DQN agents vote, the contest simulator executes</title>
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7d8793"/>
+    </marker>
+    <marker id="aa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#f2a93b"/>
+    </marker>
+    <style>
+      .card{fill:#141920;stroke:#2a323d;stroke-width:1}
+      .hot{fill:#1a1710;stroke:#f2a93b;stroke-width:1.2}
+      .llm{fill:#0f1a1c;stroke:#4fb3bf;stroke-width:1.2}
+      .k{font-size:11px;fill:#7d8793;letter-spacing:.08em}
+      .t{font-size:15px;fill:#e6ebf0;font-weight:600}
+      .s{font-size:12px;fill:#aab3bd}
+      .f{font-size:11px;fill:#7d8793}
+      .w{stroke:#7d8793;stroke-width:1.3;fill:none}
+      .wa{stroke:#f2a93b;stroke-width:1.6;fill:none}
+      .wl{stroke:#4fb3bf;stroke-width:1.3;fill:none;stroke-dasharray:5 4}
+    </style>
+  </defs>
+  <rect width="1200" height="470" rx="14" fill="#0d1014"/>
+  <text x="28" y="38" class="k">PIPELINE  /  FinRL CONTEST TASK 1  /  BTC 1-SECOND LIMIT ORDER BOOK</text>
+  <line x1="28" y1="50" x2="1172" y2="50" stroke="#232a33"/>
+
+  <!-- market path -->
+  <text x="28" y="84" class="k">MARKET</text>
+  <rect x="28" y="96" width="232" height="92" rx="8" class="card"/>
+  <text x="44" y="122" class="t">BTC_1sec.csv</text>
+  <text x="44" y="144" class="s">824,582 one-second LOB rows</text>
+  <text x="44" y="162" class="s">mid, spread, 5 book levels</text>
+  <text x="44" y="178" class="f">contest data, Apr 7-17 2021</text>
+
+  <rect x="300" y="96" width="232" height="92" rx="8" class="card"/>
+  <text x="316" y="122" class="t">Alpha101</text>
+  <text x="316" y="144" class="s">101 formulaic alphas</text>
+  <text x="316" y="162" class="s">on the order book</text>
+  <text x="316" y="178" class="f">seq_data.py</text>
+
+  <rect x="572" y="96" width="232" height="92" rx="8" class="card"/>
+  <text x="588" y="122" class="t">RNN factor miner</text>
+  <text x="588" y="144" class="s">MLP, LSTM x4, GRU x4</text>
+  <text x="588" y="162" class="s">101 in, 8 factors out</text>
+  <text x="588" y="178" class="f">seq_run.py / BTC_1sec_predict.npy</text>
+
+  <path d="M260 142 H296" class="w" marker-end="url(#ah)"/>
+  <path d="M532 142 H568" class="w" marker-end="url(#ah)"/>
+
+  <!-- news path -->
+  <text x="28" y="246" class="k" fill="#4fb3bf">NEWS</text>
+  <rect x="28" y="258" width="232" height="92" rx="8" class="llm"/>
+  <text x="44" y="284" class="t">news CSV</text>
+  <text x="44" y="306" class="s">title, text, timestamp</text>
+  <text x="44" y="324" class="s">not shipped: bring your own</text>
+  <text x="44" y="340" class="f">data/news_train.csv</text>
+
+  <rect x="300" y="258" width="504" height="92" rx="8" class="llm"/>
+  <text x="316" y="284" class="t">DeepSeek V3</text>
+  <text x="316" y="306" class="s">two JSON prompts per article: sentiment 1-5, risk 1-5,</text>
+  <text x="316" y="324" class="s">each with a confidence; retries, checkpointing, filtering</text>
+  <text x="316" y="340" class="f">deepseek_signals.py  (needs DEEPSEEK_API_KEY)</text>
+  <path d="M260 304 H296" class="wl" marker-end="url(#ah)"/>
+
+  <!-- state -->
+  <rect x="848" y="96" width="324" height="254" rx="8" class="hot"/>
+  <text x="866" y="122" class="k" fill="#f2a93b">STATE  12 NUMBERS PER STEP</text>
+  <g font-size="12">
+    <rect x="866" y="136" width="288" height="22" rx="3" fill="#232a33"/><text x="876" y="151" fill="#e6ebf0">position  holding</text><text x="1144" y="151" fill="#7d8793" text-anchor="end">2</text>
+    <rect x="866" y="164" width="288" height="22" rx="3" fill="#2a2414"/><text x="876" y="179" fill="#f2c476">RNN factors f0 .. f7</text><text x="1144" y="179" fill="#7d8793" text-anchor="end">8</text>
+    <rect x="866" y="192" width="288" height="22" rx="3" fill="#10272a"/><text x="876" y="207" fill="#7fd3dc">sentiment  risk</text><text x="1144" y="207" fill="#7d8793" text-anchor="end">2</text>
+  </g>
+  <text x="866" y="240" class="s">every 2 seconds, from</text>
+  <text x="866" y="258" class="s">trade_simulator.get_state()</text>
+  <text x="866" y="290" class="f">no news merged: sentiment = risk = 3</text>
+  <text x="866" y="306" class="f">(neutral) on every row</text>
+  <path d="M804 142 H844" class="w" marker-end="url(#ah)"/>
+  <path d="M804 304 H844" class="wl" marker-end="url(#ah)"/>
+
+  <!-- agents -->
+  <text x="28" y="398" class="k">DECIDE AND EXECUTE</text>
+  <rect x="28" y="410" width="400" height="44" rx="8" class="card"/>
+  <text x="44" y="437" class="s"><tspan fill="#e6ebf0" font-weight="600">D3QN</tspan>  ·  <tspan fill="#e6ebf0" font-weight="600">DoubleDQN</tspan>  ·  <tspan fill="#e6ebf0" font-weight="600">TwinD3QN</tspan></text>
+  <rect x="468" y="410" width="220" height="44" rx="8" class="card"/>
+  <text x="484" y="437" class="s"><tspan fill="#e6ebf0" font-weight="600">majority vote</tspan>  sell/hold/buy</text>
+  <rect x="728" y="410" width="444" height="44" rx="8" class="hot"/>
+  <text x="744" y="437" class="s"><tspan fill="#f2c476" font-weight="600">EvalTradeSimulator</tspan>  1 BTC max, slippage, stop-loss</text>
+  <path d="M1010 350 V372 H228 V406" class="wa" marker-end="url(#aa)"/>
+  <path d="M428 432 H464" class="w" marker-end="url(#ah)"/>
+  <path d="M688 432 H724" class="w" marker-end="url(#ah)"/>
+</svg>

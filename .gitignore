@@ -19,3 +19,10 @@ __pycache__/
 *.npy
 data/*.npy
 data/*.csv
+# Prepared data and training runs (scripts/prepare_data.py, task1_ensemble.py)
+data/raw/
+data/train/
+data/test/
+ensemble_teamname/
+TradeSimulator-v0_*_-1/
+runs/

@@ -13,19 +13,29 @@ Example::
 
 from __future__ import annotations
 
+import os
+
+# Sentinel: "use LARSA_DATA_DIR, else ./data".
+_FROM_ENV = "<LARSA_DATA_DIR or ./data>"
+
 
 class ConfigData:
     """Resolved file-system paths for training and inference artifacts.
 
     Args:
-        data_dir: Root directory that contains all data files.
-            Defaults to ``"./data"``.
+        data_dir: Root directory that contains all data files.  Defaults to
+            the ``LARSA_DATA_DIR`` environment variable, else ``"./data"``.
+            ``scripts/prepare_data.py`` writes ``data/train`` and
+            ``data/test`` so the same code can train on one split and be
+            evaluated on the other.
 
     Raises:
         TypeError: If *data_dir* is not a string.
     """
 
-    def __init__(self, data_dir: str = "./data") -> None:
+    def __init__(self, data_dir: str = _FROM_ENV) -> None:
+        if data_dir is _FROM_ENV:
+            data_dir = os.environ.get("LARSA_DATA_DIR", "./data")
         if not isinstance(data_dir, str):
             raise TypeError(f"data_dir must be a str, got {type(data_dir).__name__!r}")
         self.data_dir: str = data_dir

@@ -14,7 +14,7 @@ import sys
 import numpy as np
 import pytest
 
-pytest.importorskip("empyrical", reason="empyrical not installed")
+
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 

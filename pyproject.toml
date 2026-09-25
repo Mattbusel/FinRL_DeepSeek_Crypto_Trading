@@ -15,7 +15,6 @@ keywords = ["reinforcement-learning", "trading", "deepseek", "crypto", "bitcoin"
 dependencies = [
     "certifi>=2024.12.14",
     "charset-normalizer>=3.4.1",
-    "empyrical>=0.5.5",
     "filelock>=3.16.1",
     "matplotlib>=3.10.1",
     "numpy>=1.24.4,<2.0",
@@ -102,5 +101,5 @@ ignore_missing_imports = true
 exclude = ["tests/", "seq_data\\.py", "seq_net\\.py", "seq_record\\.py"]
 
 [[tool.mypy.overrides]]
-module = ["empyrical.*", "torch.*", "pandas.*", "numpy.*"]
+module = ["torch.*", "pandas.*", "numpy.*"]
 ignore_missing_imports = true

@@ -73,6 +73,17 @@ def _build_handler(stream: Any = sys.stdout) -> logging.StreamHandler:
     return handler
 
 
+# Attributes every LogRecord already has; passing them via ``extra`` raises
+# KeyError, so structured fields with these names get a trailing underscore.
+_RESERVED = frozenset(logging.makeLogRecord({}).__dict__) | {"message", "asctime"}
+
+
+def _safe_extra(kwargs: dict[str, Any]) -> dict[str, Any] | None:
+    if not kwargs:
+        return None
+    return {(f"{k}_" if k in _RESERVED else k): v for k, v in kwargs.items()}
+
+
 class _StructuredLogger:
     """Thin wrapper around :class:`logging.Logger` that accepts structlog-style calls.
 
@@ -87,32 +98,34 @@ class _StructuredLogger:
     def __init__(self, logger: logging.Logger) -> None:
         self._logger = logger
 
-    def _log(self, level: int, msg: str, **kwargs: Any) -> None:
-        self._logger.log(level, msg, extra=kwargs if kwargs else None)
+    def _log(self, level: int, msg: str, *args: Any, **kwargs: Any) -> None:
+        # Positional args keep stdlib %-style formatting working
+        # (``log.info("rows=%d", n)``) alongside structlog-style keywords.
+        self._logger.log(level, msg, *args, extra=_safe_extra(kwargs))
 
-    def debug(self, msg: str, **kwargs: Any) -> None:
+    def debug(self, msg: str, *args: Any, **kwargs: Any) -> None:
         """Log at DEBUG level with optional structured fields."""
-        self._log(logging.DEBUG, msg, **kwargs)
+        self._log(logging.DEBUG, msg, *args, **kwargs)
 
-    def info(self, msg: str, **kwargs: Any) -> None:
+    def info(self, msg: str, *args: Any, **kwargs: Any) -> None:
         """Log at INFO level with optional structured fields."""
-        self._log(logging.INFO, msg, **kwargs)
+        self._log(logging.INFO, msg, *args, **kwargs)
 
-    def warning(self, msg: str, **kwargs: Any) -> None:
+    def warning(self, msg: str, *args: Any, **kwargs: Any) -> None:
         """Log at WARNING level with optional structured fields."""
-        self._log(logging.WARNING, msg, **kwargs)
+        self._log(logging.WARNING, msg, *args, **kwargs)
 
-    def error(self, msg: str, **kwargs: Any) -> None:
+    def error(self, msg: str, *args: Any, **kwargs: Any) -> None:
         """Log at ERROR level with optional structured fields."""
-        self._log(logging.ERROR, msg, **kwargs)
+        self._log(logging.ERROR, msg, *args, **kwargs)
 
-    def critical(self, msg: str, **kwargs: Any) -> None:
+    def critical(self, msg: str, *args: Any, **kwargs: Any) -> None:
         """Log at CRITICAL level with optional structured fields."""
-        self._log(logging.CRITICAL, msg, **kwargs)
+        self._log(logging.CRITICAL, msg, *args, **kwargs)
 
-    def exception(self, msg: str, **kwargs: Any) -> None:
+    def exception(self, msg: str, *args: Any, **kwargs: Any) -> None:
         """Log at ERROR level and include the current exception traceback."""
-        self._logger.exception(msg, extra=kwargs if kwargs else None)
+        self._logger.exception(msg, *args, extra=_safe_extra(kwargs))
 
     # Delegate attribute access (e.g. .setLevel, .handlers) to the inner logger.
     def __getattr__(self, item: str) -> Any:

@@ -1,7 +1,7 @@
 """DRL agent implementations for the LARSA trading system.
 
 Provides :class:`AgentDoubleDQN`, :class:`AgentD3QN`, and
-:class:`AgentTwinD3QN` — all derived from a common Double-DQN base that
+:class:`AgentTwinD3QN`, all derived from a common Double-DQN base that
 supports vectorised environments, soft target-network updates, and optional
 state/value normalisation.
 
@@ -15,6 +15,7 @@ Example::
 from __future__ import annotations
 
 import os
+import pickle
 from copy import deepcopy
 
 import torch
@@ -27,6 +28,32 @@ from erl_replay_buffer import ReplayBuffer
 from logger import get_logger
 
 log = get_logger(__name__)
+
+
+# Network classes allowed when reading checkpoints saved as whole pickled
+# modules (the pre-2026 format, e.g. TradeSimulator-v0_D3QN_0/).
+_LEGACY_SAFE_GLOBALS = [
+    QNetTwin,
+    QNetTwinDuel,
+    torch.nn.Sequential,
+    torch.nn.Linear,
+    torch.nn.ReLU,
+    torch.nn.Softmax,
+]
+
+
+def _load_checkpoint(file_path: str, device: torch.device) -> object | None:
+    """Read a checkpoint with ``weights_only=True``.
+
+    Returns a state_dict (current format), a whole network (legacy format),
+    or ``None`` for a legacy pickled optimizer, which cannot be read safely
+    and only matters for resuming training.
+    """
+    try:
+        with torch.serialization.safe_globals(_LEGACY_SAFE_GLOBALS):
+            return torch.load(file_path, map_location=device, weights_only=True)
+    except pickle.UnpicklingError:
+        return None
 
 
 def get_optim_param(optimizer: torch.optim.Optimizer) -> list[Tensor]:
@@ -150,16 +177,20 @@ class AgentDoubleDQN:
         """
         assert self.save_attr_names.issuperset({"act", "act_target", "act_optimizer"})
 
-        for attr_name in self.save_attr_names:
+        for attr_name in sorted(self.save_attr_names):
             file_path = f"{cwd}/{attr_name}.pth"
+            obj = getattr(self, attr_name)
             if if_save:
-                torch.save(getattr(self, attr_name), file_path)
+                # state_dicts load with weights_only=True, pickled objects do not.
+                torch.save(obj.state_dict(), file_path)
             elif os.path.isfile(file_path):
-                setattr(
-                    self,
-                    attr_name,
-                    torch.load(file_path, map_location=self.device, weights_only=True),  # nosec B614
-                )
+                loaded = _load_checkpoint(file_path, self.device)
+                if loaded is None:
+                    log.warning("skip legacy checkpoint %s (optimizer state)", file_path)
+                elif isinstance(loaded, dict):
+                    obj.load_state_dict(loaded)
+                else:  # legacy checkpoint: a whole pickled network
+                    setattr(self, attr_name, loaded.to(self.device))
 
     def explore_env(
         self, env: object, horizon_len: int, if_random: bool = False

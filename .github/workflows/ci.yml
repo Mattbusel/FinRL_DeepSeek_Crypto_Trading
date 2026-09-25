@@ -8,5 +8,19 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - run: pip install -r requirements.txt --quiet 2>/dev/null || true
-      - run: python -m py_compile $(find . -name "*.py" -not -path "./.git/*" | head -50)
+      - name: Install (CPU torch + the contest pipeline's deps)
+        run: |
+          pip install --quiet torch --index-url https://download.pytorch.org/whl/cpu
+          pip install --quiet numpy pandas scipy matplotlib pydantic pydantic-settings pyyaml requests openai pytest pytest-mock pytest-asyncio
+      - name: Byte-compile every module
+        run: python -m compileall -q -x '/\.git/' .
+      - name: Contest pipeline tests
+        run: >
+          python -m pytest -q
+          tests/test_trade_simulator.py tests/test_task1_eval.py
+          tests/test_metrics.py tests/test_metrics_edge_cases.py
+          tests/test_erl_agent.py tests/test_erl_config.py tests/test_erl_evaluator.py
+          tests/test_replay_buffer.py tests/test_seq_net.py
+          tests/test_deepseek_signals.py tests/test_deepseek_signals_extended.py
+          tests/test_logger.py tests/test_data_config.py tests/test_config.py
+          tests/test_prepare_data.py

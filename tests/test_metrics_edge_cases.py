@@ -7,7 +7,7 @@ import math
 import numpy as np
 import pytest
 
-pytest.importorskip("empyrical", reason="empyrical not installed")
+
 
 from exceptions import SignalError
 from metrics import (
@@ -86,7 +86,7 @@ class TestReturnOverMaxDrawdownEdgeCases:
     def test_result_finite_with_mixed_returns(self):
         returns = [0.05, -0.1, 0.08, -0.05, 0.12]
         result = return_over_max_drawdown(returns)
-        # Can be finite or inf depending on empyrical; must not be NaN
+        # Can be finite or inf depending on the input; must not be NaN
         assert not math.isnan(result)
 
 

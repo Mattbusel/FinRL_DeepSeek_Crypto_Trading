@@ -21,7 +21,7 @@ import pandas as pd
 # ---------------------------------------------------------------------------
 
 NUM_SIMS = 4
-SEQ_LEN = 8000  # must be > 3 * seq_len (3600) to avoid randint edge cases
+SEQ_LEN = 12000  # must be > 3 * seq_len (3600) so reset() has a valid start range
 FACTOR_DIM = 8  # matches state_dim - 4 (position, holding, 2 LLM signals)
 STEP_GAP = 2
 NUM_IGNORE = 60
