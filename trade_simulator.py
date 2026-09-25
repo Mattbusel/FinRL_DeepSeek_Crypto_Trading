@@ -81,11 +81,11 @@ class TradeSimulator:
         logger.info("TradeSimulator.init -- loading price CSV from %s", args.csv_path)
         data_df = pd.read_csv(args.csv_path)
 
-        self.price_ary = data_df[["bids_distance_3", "asks_distance_3", "midpoint"]].values
+        self.price_ary = data_df[["bids_distance_3", "asks_distance_3", "midpoint"]].to_numpy(dtype=np.float64, copy=True)
         self.price_ary[:, 0] = self.price_ary[:, 2] * (1 + self.price_ary[:, 0])
         self.price_ary[:, 1] = self.price_ary[:, 2] * (1 + self.price_ary[:, 1])
 
-        self.llm_signals = data_df[["sentiment_score", "risk_score"]].values
+        self.llm_signals = data_df[["sentiment_score", "risk_score"]].to_numpy(dtype=np.float32, copy=True)
 
         # Align with the rear of the dataset so price and factors line up.
         self.price_ary = self.price_ary[-self.factor_ary.shape[0] :, :]

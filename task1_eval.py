@@ -178,7 +178,9 @@ class EnsembleEvaluator:
             action_ints.append(action_int)
             positions.append(trade_env.position)
 
-            mid_price = trade_env.price_ary[trade_env.step_i, 2].to(self.device)
+            # Price at this episode's current second (step_is is the episode start).
+            price_idx = int(trade_env.step_is[0]) + trade_env.step_i
+            mid_price = trade_env.price_ary[price_idx, 2].to(self.device)
             new_cash = self.cash[-1]
 
             if action_int > 0 and self.cash[-1] > float(mid_price):
@@ -290,6 +292,7 @@ def run_evaluation(save_path: str, agent_list: list[type]) -> None:
 
 
 if __name__ == "__main__":
-    _save_path = "trained_agents"
+    # Where task1_ensemble.py saves; override with LARSA_ENSEMBLE_DIR.
+    _save_path = os.environ.get("LARSA_ENSEMBLE_DIR", "ensemble_teamname/ensemble_models")
     _agent_list = [AgentD3QN, AgentDoubleDQN, AgentTwinD3QN]
     run_evaluation(_save_path, _agent_list)

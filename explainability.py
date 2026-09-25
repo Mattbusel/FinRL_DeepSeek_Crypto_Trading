@@ -31,7 +31,7 @@ Example (LarsaExplainer)::
     audit = explainer.generate_json_audit(explanation)
     with open("audit.jsonl", "a") as f:
         f.write(audit + "\\n")
-"""
+TradeExplainer:
 
 Wraps any LARSA DRL agent with SHAP analysis to surface the top features
 driving each trade decision.  Supports both gradient-based explanations
