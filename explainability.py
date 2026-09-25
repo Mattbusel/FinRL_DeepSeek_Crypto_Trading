@@ -810,6 +810,16 @@ class LarsaExplainer:
             "split": "#e74c3c",
         }.get(explanation.consensus, "#7f8c8d")
 
+        if explanation.similar_signals:
+            similar_section = (
+                "\n    <table>\n      <thead>\n"
+                "        <tr><th>Date</th><th>Direction</th><th>Regime</th>"
+                "<th>Confidence</th><th>Outcome</th></tr>\n      </thead>\n"
+                f"      <tbody>{similar_rows}</tbody>\n    </table>"
+            )
+        else:
+            similar_section = "<p style='color:#7f8c8d;'>No similar signals found in history.</p>"
+
         html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -953,13 +963,7 @@ class LarsaExplainer:
   <!-- Similar Historical Signals -->
   <div class="card">
     <h2>Similar Historical Signals</h2>
-    {"<p style='color:#7f8c8d;'>No similar signals found in history.</p>" if not explanation.similar_signals else f"""
-    <table>
-      <thead>
-        <tr><th>Date</th><th>Direction</th><th>Regime</th><th>Confidence</th><th>Outcome</th></tr>
-      </thead>
-      <tbody>{similar_rows}</tbody>
-    </table>"""}
+    {similar_section}
   </div>
 
   <div class="footer">
