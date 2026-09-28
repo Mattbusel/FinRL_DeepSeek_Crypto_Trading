@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bitcoin DQN Trading Bot with DeepSeek Sentiment | LARSA</title>
+<meta name="description" content="Open-source FinRL crypto trading research: a D3QN, DoubleDQN and TwinD3QN ensemble on 1-second BTC order-book data with DeepSeek sentiment. One-command demo.">
+<link rel="canonical" href="https://mattbusel.github.io/FinRL_DeepSeek_Crypto_Trading/">
+<meta name="author" content="Matthew Busel">
+<meta name="robots" content="index,follow">
+<meta name="theme-color" content="#0d1014">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="LARSA">
+<meta property="og:title" content="Bitcoin DQN Trading Bot with DeepSeek Sentiment">
+<meta property="og:description" content="Three reinforcement-learning agents vote sell, hold or buy on 1-second BTC order-book data, with DeepSeek news signals in the state. Research code, one-command demo.">
+<meta property="og:url" content="https://mattbusel.github.io/FinRL_DeepSeek_Crypto_Trading/">
+<meta property="og:image" content="https://mattbusel.github.io/FinRL_DeepSeek_Crypto_Trading/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="LARSA: BTC price over the test split and the state tape the DQN agents see">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Bitcoin DQN Trading Bot with DeepSeek Sentiment">
+<meta name="twitter:description" content="Three RL agents vote sell, hold or buy on 1-second BTC order-book data. Research code, one-command demo.">
+<meta name="twitter:image" content="https://mattbusel.github.io/FinRL_DeepSeek_Crypto_Trading/og.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230d1014'/%3E%3Cpath d='M5 22 L11 14 L16 18 L22 9 L27 13' stroke='%23f2a93b' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareSourceCode",
+  "name": "FinRL DeepSeek Crypto Trading (LARSA)",
+  "description": "FinRL contest Task 1 research entry: a DQN ensemble (D3QN, DoubleDQN, TwinD3QN) trading 1-second Bitcoin limit order book data, with DeepSeek LLM news sentiment and risk scores in the state.",
+  "codeRepository": "https://github.com/Mattbusel/FinRL_DeepSeek_Crypto_Trading",
+  "url": "https://mattbusel.github.io/FinRL_DeepSeek_Crypto_Trading/",
+  "programmingLanguage": "Python",
+  "runtimePlatform": "Python 3, PyTorch",
+  "license": "https://opensource.org/licenses/MIT",
+  "keywords": "reinforcement learning, crypto trading bot, bitcoin, DQN, D3QN, FinRL, DeepSeek, sentiment analysis, limit order book",
+  "image": "https://mattbusel.github.io/FinRL_DeepSeek_Crypto_Trading/og.png",
+  "author": {"@type": "Person", "name": "Matthew Busel", "url": "https://github.com/Mattbusel"}
+}
+</script>
+<style>
+:root{--bg:#f7f8fa;--card:#fff;--ink:#111418;--mut:#56606b;--line:#dde2e8;--acc:#b86e00;--acc-bg:#fff4e0;--code:#0d1014;--code-ink:#e6ebf0}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0d1014;--card:#141920;--ink:#e6ebf0;--mut:#9aa4af;--line:#2a323d;--acc:#f2a93b;--acc-bg:#1f1a0e;--code:#080a0d;--code-ink:#e6ebf0}}
+:root[data-theme="dark"]{--bg:#0d1014;--card:#141920;--ink:#e6ebf0;--mut:#9aa4af;--line:#2a323d;--acc:#f2a93b;--acc-bg:#1f1a0e;--code:#080a0d;--code-ink:#e6ebf0}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:960px;margin:0 auto;padding:0 16px 64px}
+header.top{max-width:960px;margin:0 auto;padding:18px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px;font:14px ui-monospace,Menlo,Consolas,monospace;color:var(--mut)}
+header.top a{color:var(--mut)}
+h1{font-size:clamp(30px,5vw,46px);line-height:1.15;margin:28px 0 12px;letter-spacing:-.01em}
+h2{font-size:26px;margin:56px 0 12px}
+h3{font-size:19px;margin:24px 0 8px}
+p.lead{font-size:20px;color:var(--ink);margin:0 0 10px}
+p.who{color:var(--mut);margin:0 0 22px}
+a{color:var(--acc)}
+.btns{display:flex;flex-wrap:wrap;gap:12px;margin:18px 0 10px}
+.btn{display:inline-block;padding:13px 22px;border-radius:10px;font-weight:700;text-decoration:none;border:2px solid var(--acc)}
+.btn.pri{background:var(--acc);color:#0d1014}
+.btn.sec{color:var(--acc)}
+.warn{border-left:4px solid var(--acc);background:var(--acc-bg);padding:12px 16px;border-radius:6px;margin:18px 0}
+figure{margin:18px 0}
+figure img{width:100%;height:auto;display:block;border-radius:12px;border:1px solid var(--line)}
+figcaption{color:var(--mut);font-size:15px;margin-top:8px}
+pre{background:var(--code);color:var(--code-ink);padding:16px;border-radius:10px;overflow-x:auto;font:14px/1.5 ui-monospace,Menlo,Consolas,monospace}
+code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.92em}
+.copy{position:relative}
+.copy button{position:absolute;top:8px;right:8px;background:#2a323d;color:#e6ebf0;border:0;border-radius:6px;padding:5px 10px;font-size:13px;cursor:pointer}
+table{border-collapse:collapse;width:100%;font-size:15px;display:block;overflow-x:auto}
+th,td{border-bottom:1px solid var(--line);padding:8px 10px;text-align:left;white-space:nowrap}
+td.n,th.n{text-align:right}
+ol li,ul li{margin:6px 0}
+footer{border-top:1px solid var(--line);margin-top:64px;padding-top:18px;color:var(--mut);font-size:15px}
+</style>
+</head>
+<body>
+<header class="top"><span>LARSA / FinRL contest Task 1</span><a href="https://github.com/Mattbusel/FinRL_DeepSeek_Crypto_Trading">GitHub</a></header>
+<main>
+<h1>Bitcoin trading bot research: three DQN agents and a DeepSeek news signal</h1>
+<p class="lead">Three small AI agents that learned to buy, sell or hold Bitcoin every 2 seconds, plus an honest replay of how they did.</p>
+<p class="who">For people learning deep reinforcement learning for trading, FinRL contest entrants, and anyone curious how an LLM sentiment score plugs into a trading agent.</p>
+<div class="btns">
+  <a class="btn pri" href="https://github.com/Mattbusel/FinRL_DeepSeek_Crypto_Trading/archive/refs/heads/main.zip">Download the code (.zip)</a>
+  <a class="btn sec" href="https://github.com/Mattbusel/FinRL_DeepSeek_Crypto_Trading">View on GitHub</a>
+</div>
+<div class="warn"><strong>Research code, not financial advice.</strong> Nothing here has traded real money. The results come from one training seed on nine days of 2021 data. Crypto trading can lose all of the capital you put in.</div>
+
+<figure>
+  <img src="img/hero-dark.png" width="2560" height="1040" alt="BTC mid price over the held-out test split, the 8 RNN order-book factors and 2 DeepSeek news signals the agents see, and the D3QN agent's sell and buy positions">
+  <figcaption>What the agents see over the 68-hour test split: price on top, the 12-number state tape below, D3QN's positions at the bottom.</figcaption>
+</figure>
+
+<h2 id="try">Try it in one command</h2>
+<p>No data download and no API key. About 15 seconds on a laptop CPU. It replays the trained agents over 4 bundled hours of the real contest test data.</p>
+<div class="copy"><button type="button" data-copy="q1">Copy</button>
+<pre id="q1">git clone https://github.com/mattbusel/FinRL_DeepSeek_Crypto_Trading &amp;&amp; cd FinRL_DeepSeek_Crypto_Trading
+pip install -r requirements-demo.txt &amp;&amp; python demo.py</pre></div>
+<p>Part of the real output (2026-09-28):</p>
+<pre>   each agent scores sell / hold / buy, then votes for its highest score:
+    AgentD3QN       sell +0.222  hold +0.214  buy +0.208   -> SELL
+    AgentDoubleDQN  sell -0.349  hold -0.345  buy -0.353   -> HOLD
+    AgentTwinD3QN   sell -0.349  hold -0.345  buy -0.353   -> HOLD
+   majority vote -> HOLD
+
+2) THE SAME HOURS, REPLAYED  (USD P&amp;L, 1 BTC position limit, after slippage)
+   episode    3-agent vote   D3QN alone   buy and hold
+   1                 +0.00      +308.41        -531.06
+   2                 +0.00      -169.21        +743.33
+   3                 +0.00        +8.62       -1000.34
+   4                 +0.00      -328.78        -242.11
+   total             +0.00      -180.95       -1030.18</pre>
+
+<h2 id="how">How one decision is made</h2>
+<figure>
+  <img src="img/decision.svg" width="1200" height="720" alt="Animated diagram of one real decision: 12 numbers (position, holding time, 8 RNN factors from the order book, DeepSeek sentiment and risk) go into D3QN, DoubleDQN and TwinD3QN; D3QN scores sell highest, the other two score hold highest; the majority vote is HOLD; the simulator applies the 1 BTC cap, stop-loss, 1 hour limit and slippage, then books the reward">
+</figure>
+<ol>
+  <li><strong>The state.</strong> Every 2 seconds the agents get 12 numbers: their position and holding time, 8 factors an RNN extracts from 101 order-book alphas, and the latest DeepSeek sentiment and risk score (1 to 5, neutral 3 when there is no headline).</li>
+  <li><strong>The agents.</strong> D3QN, DoubleDQN and TwinD3QN are 3-layer, 128-wide networks. Each scores sell, hold and buy and votes for its best score.</li>
+  <li><strong>The vote.</strong> The majority wins. The contest simulator caps the position at 1 BTC, stops out on moves against the best price, closes after an hour, charges slippage, and books the change in value as the reward.</li>
+</ol>
+<p>What the demo reveals: D3QN wants to trade, the other two learned to always hold, and TwinD3QN turned out to be an exact copy of DoubleDQN, so the 3-agent ensemble never trades.</p>
+
+<h3>The full pipeline</h3>
+<figure>
+  <img src="img/pipeline.svg" width="1200" height="470" loading="lazy" alt="Pipeline: BTC_1sec.csv to Alpha101 to RNN factor miner (8 factors); news CSV to DeepSeek V3 (sentiment, risk); both form a 12-number state; D3QN, DoubleDQN and TwinD3QN vote; EvalTradeSimulator executes">
+</figure>
+
+<h2 id="results">Results on the full test split (68 hours)</h2>
+<figure>
+  <img src="img/test-replay.svg" width="1200" height="440" loading="lazy" alt="Cumulative P&amp;L over 68 test episodes: D3QN alone ends at +798 USD, the 3-agent vote at 0, buy and hold at -2,698">
+</figure>
+<table>
+<thead><tr><th></th><th class="n">P&amp;L, USD per 1 BTC limit</th><th>Episodes won / lost / flat</th><th class="n">Time in market</th></tr></thead>
+<tbody>
+<tr><td>3-agent majority vote</td><td class="n">0.00</td><td>0 / 0 / 68</td><td class="n">0.0%</td></tr>
+<tr><td>D3QN on its own</td><td class="n">+798.15</td><td>25 / 27 / 16</td><td class="n">2.0%</td></tr>
+<tr><td>Buy and hold, same windows</td><td class="n">-2,698.19</td><td></td><td class="n">100%</td></tr>
+</tbody></table>
+<p>D3QN was mostly short during three days when BTC fell from 63,734 to 61,371, and its winning and losing hours are nearly even. One seed, one period: treat it as a working pipeline, not an edge.</p>
+
+<h2 id="reproduce">Reproduce the full run in 3 steps</h2>
+<p>The market data is public (1.4 GB, hosted by the contest organisers). Training takes about 30 minutes on a CPU.</p>
+<pre>pip install torch --index-url https://download.pytorch.org/whl/cpu
+pip install numpy pandas scipy matplotlib pydantic pydantic-settings pyyaml openai gdown
+
+# 1. download the data and split it 70/30 in time
+python scripts/prepare_data.py --download --source data/raw
+# 2. train the three agents on the first 70%
+LARSA_DATA_DIR=data/train NUM_SIMS=256 RL_BREAK_STEP=60000 python task1_ensemble.py
+# 3. replay them over the last 30%, hour by hour
+LARSA_DATA_DIR=data/test python scripts/replay_test.py</pre>
+<p>Configuration, metrics, the DeepSeek news pipeline and every file are described in the <a href="https://github.com/Mattbusel/FinRL_DeepSeek_Crypto_Trading/blob/main/docs/REFERENCE.md">reference</a>.</p>
+
+<footer>
+  MIT licensed. Built on the <a href="https://github.com/Open-Finance-Lab/FinRL_Contest_2024/tree/main/Task_1_starter_kit">FinRL Contest 2024 Task 1 starter kit</a> from the Open Finance Lab.
+  By <a href="https://github.com/Mattbusel">Matthew Busel</a>. Research code, not financial advice.
+</footer>
+</main>
+<script>
+document.querySelectorAll('button[data-copy]').forEach(function(b){b.addEventListener('click',function(){
+  var t=document.getElementById(b.dataset.copy).innerText;
+  try{navigator.clipboard.writeText(t).then(function(){b.textContent='Copied';setTimeout(function(){b.textContent='Copy'},1500)})}catch(e){}
+})});
+</script>
+</body>
+</html>

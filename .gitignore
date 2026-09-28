@@ -26,3 +26,6 @@ data/test/
 ensemble_teamname/
 TradeSimulator-v0_*_-1/
 runs/
+
+# Bundled 4-hour sample for demo.py
+!examples/sample/*.npy

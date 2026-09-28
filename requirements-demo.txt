@@ -1,0 +1,5 @@
+# Just enough to run `python demo.py` (CPU-only PyTorch, about 200 MB instead of 2 GB).
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+numpy
+pandas

@@ -1,12 +1,13 @@
 # LARSA: LLM-Augmented Regime-Switching Agent
 
-LARSA is a hybrid reinforcement-learning and large-language-model trading system
-that ingests real-time Bitcoin news, extracts structured sentiment and risk signals
-via DeepSeek V3, and routes those signals through a D3QN ensemble agent to produce
-live trade decisions.
+LARSA is a FinRL contest Task 1 research entry: three DQN agents (D3QN, DoubleDQN,
+TwinD3QN) trade Bitcoin on one-second limit-order-book data, with DeepSeek V3
+news sentiment and risk scores in their state. It is research code, not
+financial advice, and it has never traded real money.
 
 ## Quick Navigation
 
+- [Reference](REFERENCE.md) - Files, configuration, metrics, tests
 - [Architecture](architecture.md) - System design and data flow
 - [API Reference](api-reference.md) - Auto-generated module documentation
 
@@ -15,21 +16,11 @@ live trade decisions.
 ```bash
 git clone https://github.com/mattbusel/FinRL_DeepSeek_Crypto_Trading
 cd FinRL_DeepSeek_Crypto_Trading
-pip install -e ".[dev]"
-export DEEPSEEK_API_KEY="your_key_here"
-
-# Step 1: extract news signals
-python deepseek_signals.py --input ./data/news_train.csv --output ./data/news_with_signals.csv
-
-# Step 2: train the RNN factor model
-python seq_run.py
-
-# Step 3: train the agent ensemble
-python task1_ensemble.py
-
-# Step 4: evaluate on test data
-python task1_eval.py
+pip install -r requirements-demo.txt && python demo.py
 ```
+
+`demo.py` replays the trained agents over 4 bundled hours of the contest test
+data. The full data download, training and 68-hour replay are in the README.
 
 ## Project Layout
 
@@ -45,5 +36,6 @@ config.py              Centralised pydantic-settings configuration
 exceptions.py          Typed exception hierarchy
 logger.py              Structured JSON logging factory
 tests/                 pytest test suite
+demo.py                One-command demo on bundled sample data
 docs/                  This documentation
 ```

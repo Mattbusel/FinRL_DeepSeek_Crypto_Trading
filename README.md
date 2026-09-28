@@ -1,16 +1,107 @@
 <picture>
   <source media="(prefers-color-scheme: light)" srcset="assets/hero-light.png">
-  <img alt="LARSA: BTC mid price over the held-out test split, the 8 RNN factors and 2 LLM signals the agents see, and the D3QN agent's positions" src="assets/hero-dark.png" width="100%">
+  <img alt="Bitcoin DQN trading agent: BTC mid price over the held-out test split, the 8 RNN order-book factors and 2 DeepSeek news signals the agents see, and the D3QN agent's sell and buy positions" src="assets/hero-dark.png" width="100%">
 </picture>
 
-**LARSA** (LLM-Augmented Regime-Switching Agent) is an entry for Task 1 of the FinRL contest: a small ensemble of DQN agents that trades Bitcoin on one-second limit-order-book data. Each agent sees 12 numbers every 2 seconds: its own position, 8 factors from an RNN trained on 101 formulaic alphas, and 2 news signals (sentiment and risk, 1 to 5) that DeepSeek V3 extracts from headlines. The agents vote sell, hold or buy, and the contest's market-replay simulator executes the vote.
+# FinRL DeepSeek Crypto Trading (LARSA)
 
-[![CI](https://github.com/mattbusel/FinRL_DeepSeek_Crypto_Trading/actions/workflows/ci.yml/badge.svg)](https://github.com/mattbusel/FinRL_DeepSeek_Crypto_Trading/actions/workflows/ci.yml)
+**Three small AI agents that learned to buy, sell or hold Bitcoin every 2 seconds, plus an honest replay of how they did.**
+
+For people learning deep reinforcement learning for trading, FinRL contest entrants, and anyone curious how an LLM news-sentiment signal plugs into a trading agent.
+
+LARSA is a crypto trading bot research project for Task 1 of the FinRL contest: a DQN ensemble (D3QN, DoubleDQN, TwinD3QN) trained on one-second Bitcoin limit order book data, with DeepSeek LLM sentiment and risk scores in the state. The agents vote sell, hold or buy, and the contest's market-replay simulator executes the vote.
+
+[![CI](https://github.com/mattbusel/FinRL_DeepSeek_Crypto_Trading/actions/workflows/ci.yml/badge.svg)](https://github.com/mattbusel/FinRL_DeepSeek_Crypto_Trading/actions/workflows/ci.yml) &nbsp; **[Project page](https://mattbusel.github.io/FinRL_DeepSeek_Crypto_Trading/)**
 
 > [!WARNING]
-> **Research code, not financial advice.** Nothing here has been tested with real money, and the results below come from one training seed on nine days of 2021 data. Crypto trading can lose all of the capital you put in.
+> **Research code, not financial advice.** Nothing here has been tested with real money, and the results come from one training seed on nine days of 2021 data. Crypto trading can lose all of the capital you put in.
 
-## Quick start
+## Try it in one command
+
+No download, no API key, about 15 seconds on a laptop CPU. It replays the trained agents over 4 bundled hours of the real contest test data:
+
+```bash
+git clone https://github.com/mattbusel/FinRL_DeepSeek_Crypto_Trading && cd FinRL_DeepSeek_Crypto_Trading
+pip install -r requirements-demo.txt && python demo.py
+```
+
+<details open>
+<summary>Real output (2026-09-28, Python 3.12, CPU)</summary>
+
+```text
+LARSA demo: 3 DQN agents trading BTC on the contest's 1-second order book
+data   17,762 seconds from the held-out test split, 4 episodes x 3540 s
+price  63,313.23 -> 62,300.00 USD over the traded hours
+agents AgentD3QN, AgentDoubleDQN, AgentTwinD3QN (trained 2026-09-25, CPU)
+
+1) ONE DECISION, TAKEN APART
+
+   episode 1, second 3,642, BTC mid 63,321.23
+   state the agents see (12 numbers):
+           position +0.000     holding time +0.000     RNN factor 1 -0.941     RNN factor 2 -0.914
+       RNN factor 3 -0.726     RNN factor 4 -0.577     RNN factor 5 -0.712     RNN factor 6 -0.824
+       RNN factor 7 -0.862     RNN factor 8 -0.814   news sentiment +3.000        news risk +3.000
+   each agent scores sell / hold / buy, then votes for its highest score:
+    AgentD3QN       sell +0.222  hold +0.214  buy +0.208   -> SELL
+    AgentDoubleDQN  sell -0.349  hold -0.345  buy -0.353   -> HOLD
+    AgentTwinD3QN   sell -0.349  hold -0.345  buy -0.353   -> HOLD
+   majority vote -> HOLD (simulator then applies position limit, stop-loss, slippage)
+
+2) THE SAME HOURS, REPLAYED  (USD P&L, 1 BTC position limit, after slippage)
+   episode    3-agent vote   D3QN alone   buy and hold
+   1                 +0.00      +308.41        -531.06
+   2                 +0.00      -169.21        +743.33
+   3                 +0.00        +8.62       -1000.34
+   4                 +0.00      -328.78        -242.11
+   total             +0.00      -180.95       -1030.18
+
+   3-agent vote: unanimous on 92.9% of steps. DoubleDQN and TwinD3QN learned
+   'always hold', so they outvote D3QN every time and the ensemble never trades.
+   TwinD3QN is built on the same QNetTwin network as DoubleDQN (erl_agent.py) and,
+   trained with the same seed, has bit-identical weights: one vote counted twice.
+   D3QN alone: sell 619, hold 6389, buy 72 of 7080 steps, in the market 7.4% of the time.
+   4 hours is an anecdote. The full 68-hour test replay is in the README.
+
+3) per-step log of the 3-agent run: runs/demo/steps.csv
+
+Research code, not financial advice.
+```
+</details>
+
+## How one decision is made
+
+<img alt="Animated diagram of one real decision: 12 numbers (position, holding time, 8 RNN factors from the order book, DeepSeek sentiment and risk) go into D3QN, DoubleDQN and TwinD3QN; D3QN scores sell highest, the other two score hold highest; the 2-to-1 majority vote is HOLD; the simulator applies the 1 BTC cap, stop-loss, 1 hour limit and slippage, then books the reward" src="docs/img/decision.svg" width="100%">
+
+- **The state** (`trade_simulator.py`, `get_state`): your position and holding time, 8 factors that an RNN squeezes out of 101 order-book alphas, and the latest DeepSeek sentiment and risk score (1 to 5, neutral 3 when there is no headline).
+- **The agents** (`erl_net.py`): each is a 3-layer, 128-wide network that gives sell, hold and buy a score. Each votes for its highest score.
+- **The vote and the simulator** (`scripts/replay_test.py`, `trade_simulator.py`): the majority wins, then the simulator caps the position at 1 BTC, stops out on any move against the best price, closes after an hour, charges slippage and books the change in value as the reward.
+- **What the demo reveals:** D3QN wants to trade, the other two learned to always hold, and TwinD3QN turned out to be an exact copy of DoubleDQN, so the ensemble never trades. That is a real finding about this run, not a bug in the demo.
+
+The whole pipeline, from raw data to a vote:
+
+<img alt="Pipeline: BTC_1sec.csv to Alpha101 to RNN factor miner (8 factors); news CSV to DeepSeek V3 (sentiment, risk); both form a 12-number state; D3QN, DoubleDQN and TwinD3QN vote; EvalTradeSimulator executes" src="assets/pipeline.svg" width="100%">
+
+## Results on the full test split (68 hours)
+
+The same agents over the whole held-out 30% of the data, run on 2026-09-25 with the [3 steps below](#reproduce-the-full-run-in-3-steps) (Python 3.12, torch 2.14 CPU):
+
+<img alt="Terminal: prepare_data.py splits 576,577 train and 247,105 test seconds; the 3-agent replay stays flat with +0.00 USD against -2698.19 for buy and hold; D3QN alone makes +798.15 USD" src="assets/terminal-replay.png" width="100%">
+
+<img alt="Cumulative P&L over 68 test episodes: D3QN alone ends at +798 USD, the 3-agent vote at 0, buy and hold at -2,698" src="assets/test-replay.svg" width="100%">
+
+What the numbers say, and what they do not:
+
+| | P&L, USD per 1 BTC limit | Episodes won / lost / flat | Time in market |
+|---|---:|---|---:|
+| 3-agent majority vote | 0.00 | 0 / 0 / 68 | 0.0% |
+| D3QN on its own | +798.15 | 25 / 27 / 16 | 2.0% |
+| Buy and hold, same windows | -2,698.19 | | 100% |
+
+- **The ensemble never traded.** DoubleDQN and TwinD3QN converged to "always hold" in this run (their evaluation return stayed at 0.00 through training), so they outvote D3QN on every step. `task1_eval.py` on the same agents reports Sharpe `inf` and drawdown `0.0` for the same reason: no trades, no variance.
+- **D3QN alone** was mostly short (sell on 2.3% of steps, buy on 0.2%) during three days when BTC fell from 63,734 to 61,371. Winning and losing episodes are nearly even. One seed, one period, no transaction-cost stress test: treat it as a working pipeline, not an edge.
+- The replay walks the whole test split in 68 back-to-back 59-minute episodes with the contest's own `EvalTradeSimulator` (1 BTC limit, 7e-7 slippage, stop-loss, forced flat at episode end), so it is deterministic. Per-step votes, positions and rewards are in `runs/replay*/steps.csv`.
+
+## Reproduce the full run in 3 steps
 
 Runs on a laptop CPU. The market data is public: the contest organisers host it on Google Drive (1.4 GB).
 
@@ -30,127 +121,16 @@ LARSA_DATA_DIR=data/train NUM_SIMS=256 RL_BREAK_STEP=60000 python task1_ensemble
 LARSA_DATA_DIR=data/test python scripts/replay_test.py
 ```
 
-On Windows PowerShell set the variables with `$env:LARSA_DATA_DIR = "data/train"` first. Without a news file every row gets the neutral LLM signal 3 (see [News signals](#news-signals)).
+On Windows PowerShell set the variables with `$env:LARSA_DATA_DIR = "data/train"` first. Without a news file every row gets the neutral LLM signal 3 (see [News signals](docs/REFERENCE.md#news-signals-deepseek)).
 
-## What a run looks like
+## Documentation
 
-This is the real output of the three commands above, run on 2026-09-25 (Python 3.12, torch 2.14 CPU):
-
-<img alt="Terminal: prepare_data.py splits 576,577 train and 247,105 test seconds; the 3-agent replay stays flat with +0.00 USD against -2698.19 for buy and hold; D3QN alone makes +798.15 USD" src="assets/terminal-replay.png" width="100%">
-
-<img alt="Cumulative P&L over 68 test episodes: D3QN alone ends at +798 USD, the 3-agent vote at 0, buy and hold at -2,698" src="assets/test-replay.svg" width="100%">
-
-What the numbers say, and what they do not:
-
-| | P&L, USD per 1 BTC limit | Episodes won / lost / flat | Time in market |
-|---|---:|---|---:|
-| 3-agent majority vote | 0.00 | 0 / 0 / 68 | 0.0% |
-| D3QN on its own | +798.15 | 25 / 27 / 16 | 2.0% |
-| Buy and hold, same windows | -2,698.19 | | 100% |
-
-- **The ensemble never traded.** DoubleDQN and TwinD3QN converged to "always hold" in this run (their evaluation return stayed at 0.00 through training), so they outvote D3QN on every step. `task1_eval.py` on the same agents reports Sharpe `inf` and drawdown `0.0` for the same reason: no trades, no variance.
-- **D3QN alone** was mostly short (sell on 2.3% of steps, buy on 0.2%) during three days when BTC fell from 63,734 to 61,371. Winning and losing episodes are nearly even. One seed, one period, no transaction-cost stress test: treat it as a working pipeline, not an edge.
-- The replay walks the whole test split in 68 back-to-back 59-minute episodes with the contest's own `EvalTradeSimulator` (1 BTC limit, 7e-7 slippage, stop-loss, forced flat at episode end), so it is deterministic. Per-step votes, positions and rewards are in `runs/replay*/steps.csv`.
-
-## How it works
-
-<img alt="Pipeline: BTC_1sec.csv to Alpha101 to RNN factor miner (8 factors); news CSV to DeepSeek V3 (sentiment, risk); both form a 12-number state; D3QN, DoubleDQN and TwinD3QN vote; EvalTradeSimulator executes" src="assets/pipeline.svg" width="100%">
-
-| Stage | File | What it does |
-|---|---|---|
-| Data | `scripts/prepare_data.py` | Downloads the contest data, merges optional news signals, writes a time-ordered 70/30 split to `data/train` and `data/test` |
-| News signals | `deepseek_signals.py` | Two JSON prompts per article (sentiment 1-5, risk 1-5, each with a confidence and one-line reasoning); retries, checkpoints, drops low-confidence rows |
-| Factors | `seq_data.py`, `seq_run.py`, `seq_net.py` | 101 formulaic alphas on the order book, then an MLP + 4-layer LSTM + 4-layer GRU that outputs 8 factors. `data/BTC_1sec_predict.pth` holds trained weights; the quick start uses the organisers' precomputed factors |
-| Environment | `trade_simulator.py` | Vectorised market replay from the contest starter kit; state = position, holding time, 8 factors, 2 LLM signals |
-| Agents | `erl_agent.py`, `erl_net.py`, `erl_replay_buffer.py` | ElegantRL DoubleDQN, D3QN (dueling) and TwinD3QN |
-| Training | `task1_ensemble.py` | Trains each agent class and saves it under `ensemble_teamname/ensemble_models/` |
-| Evaluation | `task1_eval.py`, `scripts/replay_test.py`, `metrics.py` | Contest-style single episode with Sharpe, max drawdown and RoMaD; full-split replay with per-step logs |
-
-`TradeSimulator-v0_D3QN_0/` is the D3QN checkpoint from the original submission. It still loads (`scripts/replay_test.py --agents TradeSimulator-v0_D3QN_0`); on the test split above it also holds on every step.
-
-## News signals
-
-The contest data ships no news, and the organisers note that the timestamps in `BTC_1sec.csv` were processed and are not the true times. To use the LLM channel:
-
-```bash
-export DEEPSEEK_API_KEY=...
-python deepseek_signals.py --input data/news_train.csv --output data/news_with_signals.csv
-python scripts/prepare_data.py --signals data/news_with_signals.csv
-```
-
-The news CSV needs `title`, `text` and a time column (`date`, `timestamp`, `datetime`, `published_at` or `system_time`). Each second takes the latest scored article before it; seconds before the first article stay neutral at 3. Because the data timestamps are synthetic, any alignment with real headlines is approximate, which is why the run above leaves the channel neutral rather than guess.
-
-<details>
-<summary><b>Configuration</b> (environment variables or <code>.env</code>, validated by <code>config.py</code>)</summary>
-
-| Variable | Default | Description |
-|---|---|---|
-| `LARSA_DATA_DIR` | `./data` | Data directory the simulator reads (`data/train`, `data/test` after `prepare_data.py`) |
-| `LARSA_ENSEMBLE_DIR` | `ensemble_teamname/ensemble_models` | Where `task1_eval.py` loads agents from |
-| `DEEPSEEK_API_KEY` | (required for signals) | API key for the DeepSeek endpoint |
-| `DEEPSEEK_BASE_URL` | `https://api.deepseek.com/v1` | Endpoint URL |
-| `DEEPSEEK_MODEL` | `deepseek-chat` | Model identifier |
-| `DEEPSEEK_TEMPERATURE` | `0.0` | Sampling temperature |
-| `DEEPSEEK_MAX_TOKENS` | `300` | Max tokens per completion |
-| `MAX_RETRIES` | `5` | API retry attempts before giving up |
-| `CHECKPOINT_INTERVAL` | `10` | Save progress every N rows |
-| `MIN_CONFIDENCE_THRESHOLD` | `0.3` | Discard signals below this confidence |
-| `NUM_SIMS` | `4096` | Parallel simulations during training (256 is plenty on CPU) |
-| `RL_BREAK_STEP` | `32` | Stop training after this many steps (32 means one rollout; the run above used 60000) |
-| `RL_GAMMA` | `0.995` | Discount factor |
-| `RL_LEARNING_RATE` | `2e-6` | Learning rate |
-| `RL_BATCH_SIZE` | `512` | Mini-batch size |
-| `LOG_LEVEL` | `INFO` | Logging verbosity |
-
-Settings for the extra modules (`MULTI_ASSET_*`, `PAPER_TRADING_*`) are documented in `config.py`.
-</details>
-
-<details>
-<summary><b>Metrics</b> (<code>metrics.py</code>, numpy only)</summary>
-
-All take per-step fractional returns.
-
-| Function | Definition |
+| Read this | For |
 |---|---|
-| `sharpe_ratio` | `(mean - risk_free) / std(ddof=1)`, not annualised; `inf` when returns do not vary |
-| `max_drawdown` | `min((V_t - peak_t) / peak_t)` on the wealth path, a non-positive fraction |
-| `return_over_max_drawdown` | cumulative return / abs(max drawdown); `inf` with no drawdown |
-| `cumulative_returns` | `cumprod(1 + r) - 1` as a pandas Series |
-
-```python
-from metrics import sharpe_ratio, max_drawdown, return_over_max_drawdown
-returns = [0.001, -0.002, 0.003]
-print(sharpe_ratio(returns), max_drawdown(returns), return_over_max_drawdown(returns))
-```
-</details>
-
-<details>
-<summary><b>Extra modules</b> (outside the contest pipeline above)</summary>
-
-These were added after the contest. They have their own tests but are not used by `task1_ensemble.py` or the replay, and none of them has been run against live markets here.
-
-| Module | Purpose |
-|---|---|
-| `multi_agent_debate.py` | Bull, bear and neutral DeepSeek agents debate a trade before an arbiter decides |
-| `alt_data.py`, `onchain_signals.py` | Fear and greed index, blockchain.info on-chain stats, social and macro feeds as a feature vector |
-| `continuous_learner.py` | Replay buffer, online fine-tuning and drift detection for an agent in a live loop |
-| `portfolio_opt.py`, `risk_parity.py`, `multi_asset.py` | Mean-variance, hierarchical risk parity, min-correlation and multi-asset allocation |
-| `live_trading_bridge.py`, `paper_trading.py`, `paper_trader.py` | Dry-run by default bridge to exchange APIs, Binance-feed paper trading, Alpaca paper trading |
-| `explainability.py` | Gradient or KernelSHAP attribution per decision, HTML and JSON audit reports |
-| `hyperparameter_search.py`, `walk_forward.py`, `regime_detector.py` | Grid and random search, rolling walk-forward validation, HMM regime detection |
-| `src/` | Standalone utilities: paper trader, risk limits, ensemble voter, report generator, live WebSocket feeds, rebalancer, BHB attribution, toy environments and strategies |
-</details>
-
-<details>
-<summary><b>Tests</b></summary>
-
-```bash
-pip install pytest pytest-mock pytest-asyncio
-python -m pytest -q tests/test_trade_simulator.py tests/test_task1_eval.py tests/test_metrics.py tests/test_erl_agent.py tests/test_prepare_data.py
-```
-
-CI byte-compiles every module and runs the contest-pipeline tests on each push. A handful of tests for the extra modules fail or need optional packages (`shap`, `hmmlearn`); they are not part of CI.
-</details>
+| [docs/REFERENCE.md](docs/REFERENCE.md) | Every file and stage, DeepSeek news signals, all configuration variables, metrics, extra modules, tests |
+| [docs/architecture.md](docs/architecture.md) | Module by module design notes |
+| [CHANGELOG.md](CHANGELOG.md) | What changed and when |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | How to run the tests and send a change |
 
 ## License
 

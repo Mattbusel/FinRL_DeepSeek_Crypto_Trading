@@ -18,6 +18,7 @@ theme:
 
 nav:
   - Home: index.md
+  - Reference: REFERENCE.md
   - Architecture: architecture.md
   - API Reference: api-reference.md
 

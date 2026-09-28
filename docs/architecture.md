@@ -4,8 +4,8 @@
 
 ```
 +---------------------+       +--------------------+       +------------------+
-|  Reddit / News Feed |  -->  |  DeepSeek V3 API   |  -->  |  Signal Store    |
-|  (CSV / live feed)  |       |  deepseek_signals  |       |  (CSV + .npy)    |
+|  News CSV           |  -->  |  DeepSeek V3 API   |  -->  |  Signal Store    |
+|  (optional)         |       |  deepseek_signals  |       |  (CSV + .npy)    |
 +---------------------+       +--------------------+       +------------------+
                                                                     |
                                                                     v

@@ -1,0 +1,136 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" width="1200" height="720" font-family="ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace">
+  <title>How one decision is made: 12 numbers (position, holding time, 8 order-book factors, 2 news signals) go into three Q-networks, each scores sell, hold and buy, the majority vote wins, and the simulator applies limits before booking the reward. Values are from demo.py, episode 1, second 3,642.</title>
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7d8793"/>
+    </marker>
+    <marker id="aa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#f2a93b"/>
+    </marker>
+    <style>
+      .card{fill:#141920;stroke:#2a323d;stroke-width:1.2}
+      .k{font-size:15px;fill:#8d97a3;letter-spacing:.06em}
+      .t{font-size:20px;fill:#e6ebf0;font-weight:700}
+      .s{font-size:17px;fill:#c3cad2}
+      .v{font-size:17px;fill:#e6ebf0;text-anchor:end}
+      .f{font-size:15px;fill:#8d97a3}
+      .amb{fill:#f2a93b}
+      .tea{fill:#4fb3bf}
+      .w{stroke:#5b6572;stroke-width:1.6;fill:none}
+      .wa{stroke:#f2a93b;stroke-width:2;fill:none}
+      .chip{fill:#0d1014;stroke:#2a323d;stroke-width:1}
+      .win{fill:#1f1a0e;stroke:#f2a93b;stroke-width:2;animation:pulse 2.4s ease-in-out infinite}
+      @keyframes pulse{0%,100%{stroke-opacity:1}50%{stroke-opacity:.35}}
+      @media (prefers-reduced-motion: reduce){.win{animation:none}.dot{display:none}}
+    </style>
+  </defs>
+  <rect width="1200" height="720" rx="16" fill="#0d1014"/>
+  <text x="30" y="42" class="k">HOW ONE DECISION IS MADE  /  EVERY 2 SECONDS  /  REAL VALUES FROM demo.py</text>
+  <line x1="30" y1="56" x2="1170" y2="56" stroke="#232a33"/>
+
+  <!-- ============ STATE ============ -->
+  <text x="30" y="92" class="t">1. The state: 12 numbers</text>
+  <rect x="30" y="106" width="340" height="560" rx="10" class="card"/>
+
+  <text x="48" y="136" class="k">ACCOUNT</text>
+  <text x="48" y="164" class="s">position</text><text x="352" y="164" class="v">0.000</text>
+  <text x="48" y="190" class="s">holding time</text><text x="352" y="190" class="v">0.000</text>
+
+  <rect x="38" y="206" width="324" height="304" rx="6" fill="none" stroke="#f2a93b" stroke-opacity=".45"/>
+  <text x="48" y="232" class="k amb">ORDER BOOK &gt; 101 ALPHAS &gt; RNN</text>
+  <text x="48" y="262" class="s">factor 1</text><text x="352" y="262" class="v">-0.941</text>
+  <text x="48" y="292" class="s">factor 2</text><text x="352" y="292" class="v">-0.914</text>
+  <text x="48" y="322" class="s">factor 3</text><text x="352" y="322" class="v">-0.726</text>
+  <text x="48" y="352" class="s">factor 4</text><text x="352" y="352" class="v">-0.577</text>
+  <text x="48" y="382" class="s">factor 5</text><text x="352" y="382" class="v">-0.712</text>
+  <text x="48" y="412" class="s">factor 6</text><text x="352" y="412" class="v">-0.824</text>
+  <text x="48" y="442" class="s">factor 7</text><text x="352" y="442" class="v">-0.862</text>
+  <text x="48" y="472" class="s">factor 8</text><text x="352" y="472" class="v">-0.814</text>
+  <text x="48" y="498" class="f">seq_run.py, 8 outputs per second</text>
+
+  <rect x="38" y="522" width="324" height="132" rx="6" fill="none" stroke="#4fb3bf" stroke-opacity=".55"/>
+  <text x="48" y="548" class="k tea">HEADLINES &gt; DEEPSEEK V3</text>
+  <text x="48" y="578" class="s">news sentiment 1-5</text><text x="352" y="578" class="v">3</text>
+  <text x="48" y="608" class="s">news risk 1-5</text><text x="352" y="608" class="v">3</text>
+  <text x="48" y="638" class="f">3 = neutral: no news file here</text>
+
+  <!-- ============ AGENTS ============ -->
+  <text x="420" y="92" class="t">2. Three Q-networks score it</text>
+  <!-- D3QN -->
+  <rect x="420" y="106" width="370" height="170" rx="10" class="card"/>
+  <text x="440" y="136" class="t" style="font-size:19px">D3QN</text>
+  <text x="530" y="136" class="f">dueling heads, 3 x 128</text>
+  <rect x="440" y="154" width="104" height="62" rx="6" class="win"/>
+  <text x="492" y="178" class="f" text-anchor="middle">sell</text><text x="492" y="204" class="s" text-anchor="middle" style="fill:#f2a93b;font-weight:700">+0.222</text>
+  <rect x="553" y="154" width="104" height="62" rx="6" class="chip"/>
+  <text x="605" y="178" class="f" text-anchor="middle">hold</text><text x="605" y="204" class="s" text-anchor="middle">+0.214</text>
+  <rect x="666" y="154" width="104" height="62" rx="6" class="chip"/>
+  <text x="718" y="178" class="f" text-anchor="middle">buy</text><text x="718" y="204" class="s" text-anchor="middle">+0.208</text>
+  <text x="440" y="252" class="s">votes <tspan class="amb" font-weight="700">SELL</tspan></text>
+
+  <!-- DoubleDQN -->
+  <rect x="420" y="296" width="370" height="170" rx="10" class="card"/>
+  <text x="440" y="326" class="t" style="font-size:19px">DoubleDQN</text>
+  <text x="575" y="326" class="f">2 Q heads, 3 x 128</text>
+  <rect x="440" y="344" width="104" height="62" rx="6" class="chip"/>
+  <text x="492" y="368" class="f" text-anchor="middle">sell</text><text x="492" y="394" class="s" text-anchor="middle">-0.349</text>
+  <rect x="553" y="344" width="104" height="62" rx="6" class="win"/>
+  <text x="605" y="368" class="f" text-anchor="middle">hold</text><text x="605" y="394" class="s" text-anchor="middle" style="fill:#f2a93b;font-weight:700">-0.345</text>
+  <rect x="666" y="344" width="104" height="62" rx="6" class="chip"/>
+  <text x="718" y="368" class="f" text-anchor="middle">buy</text><text x="718" y="394" class="s" text-anchor="middle">-0.353</text>
+  <text x="440" y="442" class="s">votes <tspan class="amb" font-weight="700">HOLD</tspan></text>
+
+  <!-- TwinD3QN -->
+  <rect x="420" y="486" width="370" height="180" rx="10" class="card"/>
+  <text x="440" y="516" class="t" style="font-size:19px">TwinD3QN</text>
+  <text x="560" y="516" class="f">same net as DoubleDQN</text>
+  <rect x="440" y="534" width="104" height="62" rx="6" class="chip"/>
+  <text x="492" y="558" class="f" text-anchor="middle">sell</text><text x="492" y="584" class="s" text-anchor="middle">-0.349</text>
+  <rect x="553" y="534" width="104" height="62" rx="6" class="win"/>
+  <text x="605" y="558" class="f" text-anchor="middle">hold</text><text x="605" y="584" class="s" text-anchor="middle" style="fill:#f2a93b;font-weight:700">-0.345</text>
+  <rect x="666" y="534" width="104" height="62" rx="6" class="chip"/>
+  <text x="718" y="558" class="f" text-anchor="middle">buy</text><text x="718" y="584" class="s" text-anchor="middle">-0.353</text>
+  <text x="440" y="626" class="s">votes <tspan class="amb" font-weight="700">HOLD</tspan></text>
+  <text x="440" y="652" class="f">identical weights after training</text>
+
+  <!-- state -> agents -->
+  <path d="M370 386 C395 386 395 191 416 191" class="w" marker-end="url(#ah)"/>
+  <path d="M370 386 H416" class="w" marker-end="url(#ah)"/>
+  <path d="M370 386 C395 386 395 576 416 576" class="w" marker-end="url(#ah)"/>
+
+  <!-- ============ VOTE + SIM ============ -->
+  <text x="840" y="92" class="t">3. Vote, then execute</text>
+  <rect x="840" y="106" width="330" height="170" rx="10" class="card"/>
+  <text x="860" y="136" class="k">MAJORITY VOTE</text>
+  <text x="860" y="170" class="s">SELL  1 vote</text>
+  <text x="860" y="198" class="s">HOLD  2 votes</text>
+  <rect x="860" y="214" width="290" height="46" rx="6" class="win"/>
+  <text x="1005" y="245" class="t" text-anchor="middle" style="fill:#f2a93b">action: HOLD</text>
+
+  <rect x="840" y="296" width="330" height="302" rx="10" class="card"/>
+  <text x="860" y="326" class="k">SIMULATOR (trade_simulator.py)</text>
+  <text x="860" y="358" class="s">position capped at 1 BTC</text>
+  <text x="860" y="386" class="s">stop-loss 1e-4 USD off best</text>
+  <text x="860" y="414" class="s">force close after 1 hour</text>
+  <text x="860" y="442" class="s">flat at episode end</text>
+  <text x="860" y="470" class="s">slippage 7e-7 per trade</text>
+  <line x1="860" y1="490" x2="1150" y2="490" stroke="#232a33"/>
+  <text x="860" y="520" class="s">reward = change in</text>
+  <text x="860" y="546" class="s">cash + position x mid</text>
+  <text x="860" y="578" class="f">USD, 1 BTC position limit</text>
+
+  <path d="M790 191 H836" class="w" marker-end="url(#ah)"/>
+  <path d="M790 381 C815 381 815 236 836 236" class="w" marker-end="url(#ah)"/>
+  <path d="M790 576 C822 576 822 236 836 236" class="w" marker-end="url(#ah)"/>
+  <path d="M1005 276 V292" class="wa" marker-end="url(#aa)"/>
+
+  <!-- loop back -->
+  <path d="M1005 598 V690 H200 V670" class="wa" stroke-dasharray="6 5" marker-end="url(#aa)"/>
+  <text x="600" y="684" class="f" text-anchor="middle" style="fill:#f2a93b">new position and holding time feed the next state, 2 seconds later</text>
+
+  <!-- moving dots -->
+  <circle r="6" class="dot" fill="#f2a93b"><animateMotion dur="4s" repeatCount="indefinite" path="M370 386 C395 386 395 191 416 191 H790 H836"/></circle>
+  <circle r="6" class="dot" fill="#f2a93b"><animateMotion dur="4s" repeatCount="indefinite" path="M370 386 H416 H790 C815 381 815 236 836 236"/></circle>
+  <circle r="6" class="dot" fill="#f2a93b"><animateMotion dur="4s" repeatCount="indefinite" path="M370 386 C395 386 395 576 416 576 H790 C822 576 822 236 836 236"/></circle>
+  <circle r="6" class="dot" fill="#4fb3bf"><animateMotion dur="4s" begin="2s" repeatCount="indefinite" path="M1005 276 V598 V690 H200 V670"/></circle>
+</svg>

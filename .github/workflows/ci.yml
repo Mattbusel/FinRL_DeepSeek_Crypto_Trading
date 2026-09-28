@@ -23,4 +23,4 @@ jobs:
           tests/test_replay_buffer.py tests/test_seq_net.py
           tests/test_deepseek_signals.py tests/test_deepseek_signals_extended.py
           tests/test_logger.py tests/test_data_config.py tests/test_config.py
-          tests/test_prepare_data.py
+          tests/test_prepare_data.py tests/test_demo.py
