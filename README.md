@@ -11,7 +11,7 @@ For people learning deep reinforcement learning for trading, FinRL contest entra
 
 LARSA is a crypto trading bot research project for Task 1 of the FinRL contest: a DQN ensemble (D3QN, DoubleDQN, TwinD3QN) trained on one-second Bitcoin limit order book data, with DeepSeek LLM sentiment and risk scores in the state. The agents vote sell, hold or buy, and the contest's market-replay simulator executes the vote.
 
-[![CI](https://github.com/mattbusel/FinRL_DeepSeek_Crypto_Trading/actions/workflows/ci.yml/badge.svg)](https://github.com/mattbusel/FinRL_DeepSeek_Crypto_Trading/actions/workflows/ci.yml) &nbsp; **[Project page](https://mattbusel.github.io/FinRL_DeepSeek_Crypto_Trading/)**
+&nbsp; **[Project page](https://mattbusel.github.io/FinRL_DeepSeek_Crypto_Trading/)**
 
 > [!WARNING]
 > **Research code, not financial advice.** Nothing here has been tested with real money, and the results come from one training seed on nine days of 2021 data. Crypto trading can lose all of the capital you put in.
