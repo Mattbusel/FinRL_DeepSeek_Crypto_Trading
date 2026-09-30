@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Bitcoin DQN Trading Bot with DeepSeek Sentiment | LARSA</title>
 <meta name="description" content="Open-source FinRL crypto trading research: a D3QN, DoubleDQN and TwinD3QN ensemble on 1-second BTC order-book data with DeepSeek sentiment. One-command demo.">
-<link rel="canonical" href="https://mattbusel.github.io/FinRL_DeepSeek_Crypto_Trading/">
+<link rel="canonical" href="https://finrl-deepseek-crypto-trading.vercel.app/">
 <meta name="author" content="Matthew Busel">
 <meta name="robots" content="index,follow">
 <meta name="theme-color" content="#0d1014">
@@ -13,15 +13,15 @@
 <meta property="og:site_name" content="LARSA">
 <meta property="og:title" content="Bitcoin DQN Trading Bot with DeepSeek Sentiment">
 <meta property="og:description" content="Three reinforcement-learning agents vote sell, hold or buy on 1-second BTC order-book data, with DeepSeek news signals in the state. Research code, one-command demo.">
-<meta property="og:url" content="https://mattbusel.github.io/FinRL_DeepSeek_Crypto_Trading/">
-<meta property="og:image" content="https://mattbusel.github.io/FinRL_DeepSeek_Crypto_Trading/og.png">
+<meta property="og:url" content="https://finrl-deepseek-crypto-trading.vercel.app/">
+<meta property="og:image" content="https://finrl-deepseek-crypto-trading.vercel.app/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="LARSA: BTC price over the test split and the state tape the DQN agents see">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Bitcoin DQN Trading Bot with DeepSeek Sentiment">
 <meta name="twitter:description" content="Three RL agents vote sell, hold or buy on 1-second BTC order-book data. Research code, one-command demo.">
-<meta name="twitter:image" content="https://mattbusel.github.io/FinRL_DeepSeek_Crypto_Trading/og.png">
+<meta name="twitter:image" content="https://finrl-deepseek-crypto-trading.vercel.app/og.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230d1014'/%3E%3Cpath d='M5 22 L11 14 L16 18 L22 9 L27 13' stroke='%23f2a93b' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
 <script type="application/ld+json">
 {
@@ -29,14 +29,14 @@
   "@type": "SoftwareSourceCode",
   "name": "FinRL DeepSeek Crypto Trading (LARSA)",
   "description": "FinRL contest Task 1 research entry: a DQN ensemble (D3QN, DoubleDQN, TwinD3QN) trading 1-second Bitcoin limit order book data, with DeepSeek LLM news sentiment and risk scores in the state.",
-  "codeRepository": "https://github.com/Mattbusel/FinRL_DeepSeek_Crypto_Trading",
-  "url": "https://mattbusel.github.io/FinRL_DeepSeek_Crypto_Trading/",
+  "codeRepository": "https://gitlab.com/mattbusel/FinRL_DeepSeek_Crypto_Trading",
+  "url": "https://finrl-deepseek-crypto-trading.vercel.app/",
   "programmingLanguage": "Python",
   "runtimePlatform": "Python 3, PyTorch",
   "license": "https://opensource.org/licenses/MIT",
   "keywords": "reinforcement learning, crypto trading bot, bitcoin, DQN, D3QN, FinRL, DeepSeek, sentiment analysis, limit order book",
-  "image": "https://mattbusel.github.io/FinRL_DeepSeek_Crypto_Trading/og.png",
-  "author": {"@type": "Person", "name": "Matthew Busel", "url": "https://github.com/Mattbusel"}
+  "image": "https://finrl-deepseek-crypto-trading.vercel.app/og.png",
+  "author": {"@type": "Person", "name": "Matthew Busel", "url": "https://gitlab.com/mattbusel"}
 }
 </script>
 <style>
@@ -74,14 +74,14 @@ footer{border-top:1px solid var(--line);margin-top:64px;padding-top:18px;color:v
 </style>
 </head>
 <body>
-<header class="top"><span>LARSA / FinRL contest Task 1</span><a href="https://github.com/Mattbusel/FinRL_DeepSeek_Crypto_Trading">GitHub</a></header>
+<header class="top"><span>LARSA / FinRL contest Task 1</span><a href="https://gitlab.com/mattbusel/FinRL_DeepSeek_Crypto_Trading">GitHub</a></header>
 <main>
 <h1>Bitcoin trading bot research: three DQN agents and a DeepSeek news signal</h1>
 <p class="lead">Three small AI agents that learned to buy, sell or hold Bitcoin every 2 seconds, plus an honest replay of how they did.</p>
 <p class="who">For people learning deep reinforcement learning for trading, FinRL contest entrants, and anyone curious how an LLM sentiment score plugs into a trading agent.</p>
 <div class="btns">
-  <a class="btn pri" href="https://github.com/Mattbusel/FinRL_DeepSeek_Crypto_Trading/archive/refs/heads/main.zip">Download the code (.zip)</a>
-  <a class="btn sec" href="https://github.com/Mattbusel/FinRL_DeepSeek_Crypto_Trading">View on GitHub</a>
+  <a class="btn pri" href="https://gitlab.com/mattbusel/FinRL_DeepSeek_Crypto_Trading/-/archive/main/FinRL_DeepSeek_Crypto_Trading-main.zip">Download the code (.zip)</a>
+  <a class="btn sec" href="https://gitlab.com/mattbusel/FinRL_DeepSeek_Crypto_Trading">View on GitHub</a>
 </div>
 <div class="warn"><strong>Research code, not financial advice.</strong> Nothing here has traded real money. The results come from one training seed on nine days of 2021 data. Crypto trading can lose all of the capital you put in.</div>
 
@@ -93,7 +93,7 @@ footer{border-top:1px solid var(--line);margin-top:64px;padding-top:18px;color:v
 <h2 id="try">Try it in one command</h2>
 <p>No data download and no API key. About 15 seconds on a laptop CPU. It replays the trained agents over 4 bundled hours of the real contest test data.</p>
 <div class="copy"><button type="button" data-copy="q1">Copy</button>
-<pre id="q1">git clone https://github.com/mattbusel/FinRL_DeepSeek_Crypto_Trading &amp;&amp; cd FinRL_DeepSeek_Crypto_Trading
+<pre id="q1">git clone https://gitlab.com/mattbusel/FinRL_DeepSeek_Crypto_Trading &amp;&amp; cd FinRL_DeepSeek_Crypto_Trading
 pip install -r requirements-demo.txt &amp;&amp; python demo.py</pre></div>
 <p>Part of the real output (2026-09-28):</p>
 <pre>   each agent scores sell / hold / buy, then votes for its highest score:
@@ -150,11 +150,11 @@ python scripts/prepare_data.py --download --source data/raw
 LARSA_DATA_DIR=data/train NUM_SIMS=256 RL_BREAK_STEP=60000 python task1_ensemble.py
 # 3. replay them over the last 30%, hour by hour
 LARSA_DATA_DIR=data/test python scripts/replay_test.py</pre>
-<p>Configuration, metrics, the DeepSeek news pipeline and every file are described in the <a href="https://github.com/Mattbusel/FinRL_DeepSeek_Crypto_Trading/blob/main/docs/REFERENCE.md">reference</a>.</p>
+<p>Configuration, metrics, the DeepSeek news pipeline and every file are described in the <a href="https://gitlab.com/mattbusel/FinRL_DeepSeek_Crypto_Trading/-/blob/main/docs/REFERENCE.md">reference</a>.</p>
 
 <footer>
   MIT licensed. Built on the <a href="https://github.com/Open-Finance-Lab/FinRL_Contest_2024/tree/main/Task_1_starter_kit">FinRL Contest 2024 Task 1 starter kit</a> from the Open Finance Lab.
-  By <a href="https://github.com/Mattbusel">Matthew Busel</a>. Research code, not financial advice.
+  By <a href="https://gitlab.com/mattbusel">Matthew Busel</a>. Research code, not financial advice.
 </footer>
 </main>
 <script>

@@ -11,7 +11,7 @@ For people learning deep reinforcement learning for trading, FinRL contest entra
 
 LARSA is a crypto trading bot research project for Task 1 of the FinRL contest: a DQN ensemble (D3QN, DoubleDQN, TwinD3QN) trained on one-second Bitcoin limit order book data, with DeepSeek LLM sentiment and risk scores in the state. The agents vote sell, hold or buy, and the contest's market-replay simulator executes the vote.
 
-&nbsp; **[Project page](https://mattbusel.github.io/FinRL_DeepSeek_Crypto_Trading/)**
+&nbsp; **[Project page](https://finrl-deepseek-crypto-trading.vercel.app/)**
 
 > [!WARNING]
 > **Research code, not financial advice.** Nothing here has been tested with real money, and the results come from one training seed on nine days of 2021 data. Crypto trading can lose all of the capital you put in.
@@ -21,7 +21,7 @@ LARSA is a crypto trading bot research project for Task 1 of the FinRL contest: 
 No download, no API key, about 15 seconds on a laptop CPU. It replays the trained agents over 4 bundled hours of the real contest test data:
 
 ```bash
-git clone https://github.com/mattbusel/FinRL_DeepSeek_Crypto_Trading && cd FinRL_DeepSeek_Crypto_Trading
+git clone https://gitlab.com/mattbusel/FinRL_DeepSeek_Crypto_Trading && cd FinRL_DeepSeek_Crypto_Trading
 pip install -r requirements-demo.txt && python demo.py
 ```
 
@@ -106,7 +106,7 @@ What the numbers say, and what they do not:
 Runs on a laptop CPU. The market data is public: the contest organisers host it on Google Drive (1.4 GB).
 
 ```bash
-git clone https://github.com/mattbusel/FinRL_DeepSeek_Crypto_Trading
+git clone https://gitlab.com/mattbusel/FinRL_DeepSeek_Crypto_Trading
 cd FinRL_DeepSeek_Crypto_Trading
 pip install torch --index-url https://download.pytorch.org/whl/cpu
 pip install numpy pandas scipy matplotlib pydantic pydantic-settings pyyaml openai gdown
@@ -136,4 +136,4 @@ On Windows PowerShell set the variables with `$env:LARSA_DATA_DIR = "data/train"
 
 MIT, see [LICENSE](LICENSE). Built on the [FinRL Contest 2024 Task 1 starter kit](https://github.com/Open-Finance-Lab/FinRL_Contest_2024/tree/main/Task_1_starter_kit) (ElegantRL agents and market-replay simulator) from the Open Finance Lab.
 
-Author: Matthew C. Busel ([mattbusel@gmail.com](mailto:mattbusel@gmail.com), [github.com/mattbusel](https://github.com/mattbusel))
+Author: Matthew C. Busel ([mattbusel@gmail.com](mailto:mattbusel@gmail.com), [gitlab.com/mattbusel](https://gitlab.com/mattbusel))

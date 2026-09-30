@@ -15,7 +15,7 @@ Thank you for your interest in contributing. Please follow the guidelines below.
 ## Setup
 
 ```bash
-git clone https://github.com/mattbusel/FinRL_DeepSeek_Crypto_Trading.git
+git clone https://gitlab.com/mattbusel/FinRL_DeepSeek_Crypto_Trading.git
 cd FinRL_DeepSeek_Crypto_Trading
 
 python -m venv venv

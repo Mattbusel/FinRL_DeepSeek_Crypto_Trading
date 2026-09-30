@@ -14,7 +14,7 @@ financial advice, and it has never traded real money.
 ## Quickstart
 
 ```bash
-git clone https://github.com/mattbusel/FinRL_DeepSeek_Crypto_Trading
+git clone https://gitlab.com/mattbusel/FinRL_DeepSeek_Crypto_Trading
 cd FinRL_DeepSeek_Crypto_Trading
 pip install -r requirements-demo.txt && python demo.py
 ```

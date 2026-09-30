@@ -1,7 +1,7 @@
 site_name: "LARSA - LLM-Augmented Regime-Switching Agent"
 site_description: "Documentation for the LARSA BTC algorithmic trading system"
 site_author: "Matthew C. Busel"
-repo_url: "https://github.com/mattbusel/FinRL_DeepSeek_Crypto_Trading"
+repo_url: "https://gitlab.com/mattbusel/FinRL_DeepSeek_Crypto_Trading"
 repo_name: "mattbusel/FinRL_DeepSeek_Crypto_Trading"
 
 theme:

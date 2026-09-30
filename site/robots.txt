@@ -1,3 +1,3 @@
 User-agent: *
 Allow: /
-Sitemap: https://mattbusel.github.io/FinRL_DeepSeek_Crypto_Trading/sitemap.xml
+Sitemap: https://finrl-deepseek-crypto-trading.vercel.app/sitemap.xml
