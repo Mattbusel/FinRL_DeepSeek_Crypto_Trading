@@ -5,6 +5,8 @@
 
 # FinRL DeepSeek Crypto Trading (LARSA)
 
+English | [简体中文](README.zh-CN.md) | [日本語](README.ja.md) | [한국어](README.ko.md)
+
 **Three small AI agents that learned to buy, sell or hold Bitcoin every 2 seconds, plus an honest replay of how they did.**
 
 For people learning deep reinforcement learning for trading, FinRL contest entrants, and anyone curious how an LLM news-sentiment signal plugs into a trading agent.
