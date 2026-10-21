@@ -5,6 +5,14 @@
 
 # FinRL DeepSeek Crypto Trading (LARSA)
 
+<!-- outcome-block -->
+**A crypto trading agent that changes strategy when the news changes: DeepSeek V3 turns BTC headlines into sentiment and risk signals that steer an ensemble of DQN agents.**
+
+**Why this over the alternatives:** Price-only agents miss news-driven regime shifts. This feeds structured, confidence-filtered news signals into every decision.
+
+**Guarantee:** if it doesn't do what this README says, [open an issue](https://github.com/Mattbusel/FinRL_DeepSeek_Crypto_Trading/issues) and I'll fix it.
+<!-- outcome-block -->
+
 English | [简体中文](README.zh-CN.md) | [日本語](README.ja.md) | [한국어](README.ko.md)
 
 **Three small AI agents that learned to buy, sell or hold Bitcoin every 2 seconds, plus an honest replay of how they did.**
